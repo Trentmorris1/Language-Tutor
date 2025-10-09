@@ -39,37 +39,38 @@ Our team’s goal is to collaboratively design and develop an AI-powered languag
 Flask tutorial: https://flask.palletsprojects.com/en/stable/tutorial/layout/
 The plan is to use the above flask tutorial to set up the app and update the code and the structure given to make our language tutor using the following file structure, with some changes if needed along the development process. 
 
-/home/user/Projects/language-tutor
-├── tutorapp/
-│   ├── __init__.py
-│   ├── db.py
-│   ├── schema.sql
-│   ├── auth.py                ← user login/register (same as Flask tutorial)
-│   ├── lessons.py             ← replaces blog.py (handles exercises/lessons)
-│   ├── feedback.py            ← new module (AI/NLP feedback + analytics)
-│   ├── templates/
-│   │   ├── base.html
-│   │   ├── auth/
-│   │   │   ├── login.html
-│   │   │   └── register.html
-│   │   ├── lessons/
-│   │   │   ├── index.html     ← lesson list or dashboard
-│   │   │   ├── exercise.html  ← where user inputs text
-│   │   │   └── result.html    ← shows feedback (optional)
-│   │   └── feedback/
-│   │       └── analytics.html ← progress charts, grammar stats
-│   └── static/
-│       ├── style.css
-│       └── script.js          ← for AJAX calls, frontend interactivity
-├── tests/
-│   ├── conftest.py
-│   ├── data.sql
-│   ├── test_factory.py
-│   ├── test_db.py
-│   ├── test_auth.py
-│   ├── test_lessons.py
-│   └── test_feedback.py
-├── .venv/
-├── pyproject.toml
-└── MANIFEST.in
-
+```
+/home/user/Projects/language-tutor  
+├── tutorapp/  
+│   ├── __init__.py  
+│   ├── db.py  
+│   ├── schema.sql  
+│   ├── auth.py                ← user login/register (same as Flask tutorial)  
+│   ├── lessons.py             ← replaces blog.py (handles exercises/lessons)  
+│   ├── feedback.py            ← new module (AI/NLP feedback + analytics)  
+│   ├── templates/  
+│   │   ├── base.html  
+│   │   ├── auth/  
+│   │   │   ├── login.html  
+│   │   │   └── register.html  
+│   │   ├── lessons/  
+│   │   │   ├── index.html     ← lesson list or dashboard  
+│   │   │   ├── exercise.html  ← where user inputs text  
+│   │   │   └── result.html    ← shows feedback (optional)  
+│   │   └── feedback/  
+│   │       └── analytics.html ← progress charts, grammar stats  
+│   └── static/  
+│       ├── style.css  
+│       └── script.js          ← for AJAX calls, frontend interactivity  
+├── tests/  
+│   ├── conftest.py  
+│   ├── data.sql  
+│   ├── test_factory.py  
+│   ├── test_db.py  
+│   ├── test_auth.py  
+│   ├── test_lessons.py  
+│   └── test_feedback.py  
+├── .venv/  
+├── pyproject.toml  
+└── MANIFEST.in  
+```
