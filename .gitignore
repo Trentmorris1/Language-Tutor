@@ -1,0 +1,31 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environment
+.venv/
+venv/
+
+# Environment variables
+.env
+
+# SQLite database (local)
+instance/
+*.sqlite3
+*.db
+
+# Flask instance folder (contains runtime files)
+instance/
+
+# IDE and OS junk
+.vscode/
+.idea/
+.DS_Store
+
+# Bytecode or compiled files
+*.log
+*.pot
+*.pyc
+*.pyo
+*.pyd

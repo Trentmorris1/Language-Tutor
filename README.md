@@ -35,3 +35,42 @@ Security metrics should be gathered and optimized.
 User interface metrics should be gathered and optimized.
 
 Our team’s goal is to collaboratively design and develop an AI-powered language learning system that meets all mandatory functional and non-functional requirements while continually improving through added features and refinements. We aim to create a secure, efficient, and user-friendly platform that personalizes lessons, provides interactive practice with real-time feedback, and tracks user progress in a meaningful way. As a team, we expect consistent communication, equal contributions, and accountability from all members to ensure project success. We will prioritize maintaining high standards in functionality, performance, security, and usability, while also supporting one another in learning and applying course concepts. By staying organized, meeting deadlines, and following best practices in software development, our team is committed to delivering a system that not only fulfills the project requirements but also demonstrates our growth and collaboration throughout the course.
+
+Flask tutorial: https://flask.palletsprojects.com/en/stable/tutorial/layout/
+The plan is to use the above flask tutorial to set up the app and update the code and the structure given to make our language tutor using the following file structure, with some changes if needed along the development process. 
+
+```
+/home/user/Projects/language-tutor  
+├── tutorapp/  
+│   ├── __init__.py  
+│   ├── db.py  
+│   ├── schema.sql  
+│   ├── auth.py                ← user login/register (same as Flask tutorial)  
+│   ├── lessons.py             ← replaces blog.py (handles exercises/lessons)  
+│   ├── feedback.py            ← new module (AI/NLP feedback + analytics)  
+│   ├── templates/  
+│   │   ├── base.html  
+│   │   ├── auth/  
+│   │   │   ├── login.html  
+│   │   │   └── register.html  
+│   │   ├── lessons/  
+│   │   │   ├── index.html     ← lesson list or dashboard  
+│   │   │   ├── exercise.html  ← where user inputs text  
+│   │   │   └── result.html    ← shows feedback (optional)  
+│   │   └── feedback/  
+│   │       └── analytics.html ← progress charts, grammar stats  
+│   └── static/  
+│       ├── style.css  
+│       └── script.js          ← for AJAX calls, frontend interactivity  
+├── tests/  
+│   ├── conftest.py  
+│   ├── data.sql  
+│   ├── test_factory.py  
+│   ├── test_db.py  
+│   ├── test_auth.py  
+│   ├── test_lessons.py  
+│   └── test_feedback.py  
+├── .venv/  
+├── pyproject.toml  
+└── MANIFEST.in  
+```
