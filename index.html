@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Language Tutor - AI-Assisted Learning</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Configure Tailwind to use Inter font and custom colors -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'primary': '#0056b3', // Deep Blue
+                        'secondary': '#00a8e8', // Light Blue
+                        'accent': '#ffc107', // Gold/Amber for accents
+                        'background': '#f4f7f9',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom styles for better aesthetics */
+        body {
+            background-color: #f4f7f9;
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+        }
+        .card {
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+        .btn-primary {
+            transition: transform 0.1s ease, background-color 0.1s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body class="flex flex-col">
+
+    <!-- Header (Always visible) -->
+    <header class="bg-primary text-white p-4 shadow-lg sticky top-0 z-10">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <h1 class="text-3xl font-extrabold tracking-tight">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 inline-block mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                </svg>
+                Language Tutor <span class="hidden sm:inline text-sm font-light">| AI-Assisted Learning</span>
+            </h1>
+            <div id="auth-status" class="text-right text-sm">
+                <!-- User ID/Login Status will be displayed here -->
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow p-4 sm:p-8">
+        <div class="max-w-4xl mx-auto">
+            <div id="app-container" class="bg-white card rounded-xl p-6 sm:p-10">
+                <!-- Content will be rendered here based on the 'view' state -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white p-4 text-center text-xs">
+        <p>CS 360 Language Tutor | Designed for real-time AI-driven feedback (Latency target: &lt;5s)</p>
+        <p id="app-info"></p>
+    </footer>
+
+    <!-- Firebase SDK Imports -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global variables provided by the environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let app;
+        let db;
+        let auth;
+        let currentUserId = null;
+        let isAuthReady = false;
+
+        setLogLevel('Debug');
+
+        /**
+         * Initializes Firebase and authenticates the user.
+         */
+        async function initializeFirebase() {
+            try {
+                if (Object.keys(firebaseConfig).length === 0) {
+                    console.error("Firebase config is missing. App cannot persist data.");
+                    document.getElementById('app-info').textContent = 'Warning: Firebase Not Configured.';
+                    // Proceeding anonymously without persistent storage connection if config is missing
+                    auth = { currentUser: { uid: 'anonymous_' + crypto.randomUUID() } };
+                    currentUserId = auth.currentUser.uid;
+                    isAuthReady = true;
+                    renderApp();
+                    return;
+                }
+
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                document.getElementById('app-info').textContent = `App ID: ${appId}`;
+
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        currentUserId = user.uid;
+                        console.log("User authenticated:", currentUserId);
+                    } else {
+                        // This should only happen if sign-in failed or was anonymous
+                        currentUserId = 'anonymous_' + crypto.randomUUID();
+                        console.log("User signed out or anonymous session:", currentUserId);
+                    }
+                    isAuthReady = true;
+                    renderApp(); // Render the app once auth status is confirmed
+                });
+
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+            } catch (error) {
+                console.error("Firebase initialization or sign-in failed:", error);
+                // Fallback to a non-authenticated state if initialization fails
+                isAuthReady = true;
+                renderApp();
+            }
+        }
+
+        // --- Application Logic and State Management ---
+        
+        let appState = {
+            view: 'login', // 'login', 'dashboard', 'practice_setup', 'exercise'
+            language: 'English',
+            proficiency: 'Intermediate',
+            userName: 'Learner',
+            isLoggedIn: false
+        };
+
+        const appContainer = document.getElementById('app-container');
+        const authStatusElement = document.getElementById('auth-status');
+
+        /**
+         * Renders the current view based on appState.view.
+         */
+        function renderApp() {
+            if (!isAuthReady) {
+                appContainer.innerHTML = '<div class="text-center p-8"><p class="text-primary font-semibold">Loading authentication...</p></div>';
+                return;
+            }
+
+            authStatusElement.innerHTML = appState.isLoggedIn
+                ? `<p class="font-bold">Welcome, ${appState.userName}</p><p class="text-xs">User ID: ${currentUserId}</p>`
+                : `<button onclick="window.app.setView('login')" class="bg-accent text-gray-800 px-3 py-1 rounded-lg font-bold hover:bg-yellow-400">Log In</button>`;
+
+            switch (appState.view) {
+                case 'login':
+                    appContainer.innerHTML = renderLogin();
+                    break;
+                case 'dashboard':
+                    appContainer.innerHTML = renderDashboard();
+                    break;
+                case 'practice_setup':
+                    appContainer.innerHTML = renderPracticeSetup();
+                    break;
+                case 'exercise':
+                    appContainer.innerHTML = renderExercise();
+                    break;
+                default:
+                    appContainer.innerHTML = renderLogin();
+            }
+        }
+
+        /**
+         * Updates the application state and re-renders the UI.
+         * @param {string} newView - The new view state.
+         */
+        function setView(newView) {
+            appState.view = newView;
+            renderApp();
+        }
+
+        // --- View Rendering Functions ---
+
+        function renderLogin() {
+            return `
+                <div class="text-center p-8">
+                    <h2 class="text-3xl font-bold text-primary mb-6">Welcome to Language Tutor</h2>
+                    <p class="text-gray-600 mb-8">Sign in to access your personalized, AI-assisted learning path and track your progress.</p>
+                    
+                    <form onsubmit="event.preventDefault(); window.app.handleLogin(this);" class="max-w-sm mx-auto space-y-4">
+                        <input type="text" id="login-username" value="TrentMorris" placeholder="Username" required 
+                               class="w-full p-3 border border-gray-300 rounded-lg focus:ring-secondary focus:border-secondary">
+                        <input type="password" id="login-password" value="password123" placeholder="Password" required 
+                               class="w-full p-3 border border-gray-300 rounded-lg focus:ring-secondary focus:border-secondary">
+                        <button type="submit" class="w-full btn-primary bg-secondary text-white p-3 rounded-lg font-semibold shadow-md">
+                            Log In & Continue
+                        </button>
+                        <p class="text-sm text-gray-500 pt-2">User ID for reference: ${currentUserId}</p>
+                    </form>
+                </div>
+            `;
+        }
+
+        function handleLogin(form) {
+            // Mock authentication success
+            const username = form.elements['login-username'].value;
+            appState.userName = username || 'Learner';
+            appState.isLoggedIn = true;
+            setView('dashboard');
+        }
+
+        function renderDashboard() {
+            return `
+                <div class="space-y-8">
+                    <h2 class="text-3xl font-bold text-primary">Your Learning Dashboard</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+                        <div class="bg-background p-6 rounded-xl border-t-4 border-secondary shadow-inner">
+                            <p class="text-4xl font-extrabold text-secondary">85%</p>
+                            <p class="text-sm text-gray-600 mt-2">Grammar Accuracy (FR4)</p>
+                        </div>
+                        <div class="bg-background p-6 rounded-xl border-t-4 border-secondary shadow-inner">
+                            <p class="text-4xl font-extrabold text-secondary">+124</p>
+                            <p class="text-sm text-gray-600 mt-2">Vocabulary Growth (FR4)</p>
+                        </div>
+                        <div class="bg-background p-6 rounded-xl border-t-4 border-secondary shadow-inner">
+                            <p class="text-4xl font-extrabold text-secondary">B2</p>
+                            <p class="text-sm text-gray-600 mt-2">Current Fluency Level</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <button onclick="window.app.setView('practice_setup')"
+                                class="btn-primary bg-primary text-white p-5 rounded-xl font-semibold text-lg shadow-lg flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l2 5m-2-5l-5 2" />
+                            </svg>
+                            Start New Practice (FR2)
+                        </button>
+                        <button onclick="window.app.setView('custom_upload')"
+                                class="btn-primary bg-accent text-gray-800 p-5 rounded-xl font-semibold text-lg shadow-lg flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                            </svg>
+                            Upload Custom Content (FR5)
+                        </button>
+                    </div>
+
+                    <div class="bg-gray-100 p-5 rounded-xl border border-gray-200">
+                        <h3 class="text-xl font-semibold text-gray-800">Review List (FR8)</h3>
+                        <ul class="list-disc list-inside mt-2 text-gray-700">
+                            <li>Affect / Effect</li>
+                            <li>Apathetic (Common Error)</li>
+                            <li>Derelict (New Vocabulary)</li>
+                        </ul>
+                        <a href="#" class="text-primary hover:underline mt-2 inline-block text-sm">View full list</a>
+                    </div>
+
+                    <button onclick="window.app.setView('login'); appState.isLoggedIn = false;" 
+                        class="text-sm text-red-500 hover:text-red-700 hover:underline mt-4">Log Out</button>
+                </div>
+            `;
+        }
+
+        function renderPracticeSetup() {
+            return `
+                <div class="space-y-6">
+                    <h2 class="text-3xl font-bold text-primary">Set Up Practice Session</h2>
+                    <p class="text-gray-600">Select your target language and proficiency level to personalize the exercises (FR1).</p>
+                    
+                    <div class="space-y-4 max-w-lg">
+                        <div>
+                            <label for="language-select" class="block text-sm font-medium text-gray-700 mb-1">Target Language:</label>
+                            <select id="language-select" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                                <option>English (Selected)</option>
+                                <option>Spanish</option>
+                                <option>French</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label for="proficiency-select" class="block text-sm font-medium text-gray-700 mb-1">Proficiency Level:</label>
+                            <select id="proficiency-select" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                                <option>Beginner</option>
+                                <option selected>Intermediate (Current)</option>
+                                <option>Advanced</option>
+                            </select>
+                        </div>
+
+                        <div class="pt-4">
+                            <button onclick="window.app.setView('exercise')" 
+                                    class="w-full btn-primary bg-secondary text-white p-4 rounded-xl font-semibold text-lg shadow-md">
+                                Start Writing Composition
+                            </button>
+                        </div>
+                    </div>
+                    <button onclick="window.app.setView('dashboard')" class="text-primary hover:underline mt-4">
+                        &larr; Back to Dashboard
+                    </button>
+                </div>
+            `;
+        }
+        
+        function renderExercise() {
+            return `
+                <div class="space-y-6">
+                    <h2 class="text-3xl font-bold text-primary">Interactive Writing Exercise</h2>
+                    <p class="text-sm text-secondary font-semibold">Language: English | Level: Intermediate</p>
+
+                    <div class="bg-background p-6 rounded-xl border border-gray-300">
+                        <p class="font-medium text-lg mb-4">Prompt:</p>
+                        <p class="text-gray-700">Describe the challenges and opportunities presented by artificial intelligence in the field of education. Write at least 150 words.</p>
+                    </div>
+
+                    <div>
+                        <label for="user-input" class="block text-lg font-medium text-gray-700 mb-2">Your Composition (FR2):</label>
+                        <textarea id="user-input" rows="8" placeholder="Type your response here..." 
+                                  class="w-full p-4 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"></textarea>
+                    </div>
+
+                    <div class="flex justify-between items-center">
+                        <button onclick="window.app.showFeedback()" 
+                                class="btn-primary bg-primary text-white p-3 rounded-xl font-semibold shadow-md">
+                            Submit & Get AI Feedback (FR3)
+                        </button>
+                        <p id="latency-tip" class="text-xs text-gray-500">Target feedback latency: <5 seconds.</p>
+                    </div>
+
+                    <div id="ai-feedback" class="hidden bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-lg">
+                        <!-- AI Feedback will be injected here -->
+                    </div>
+                    
+                    <button onclick="window.app.setView('dashboard')" class="text-primary hover:underline mt-4">
+                        &larr; Finish Session
+                    </button>
+                </div>
+            `;
+        }
+
+        function showFeedback() {
+            const feedbackElement = document.getElementById('ai-feedback');
+            feedbackElement.classList.remove('hidden');
+            feedbackElement.innerHTML = `
+                <h3 class="font-bold text-lg mb-2">AI-Powered Correction & Guidance (FR3)</h3>
+                <p><strong>Grammar Error Detected:</strong> "The data is analyzed." &rarr; Correction: "The data <span class="font-bold">are</span> analyzed." (Explaination: Data is a plural noun).</p>
+                <p class="mt-2"><strong>Vocabulary Suggestion:</strong> Consider replacing "very big" with the more precise term "extensive" or "massive."</p>
+                <p class="mt-2 text-sm text-gray-600">Feedback delivered in 1.2 seconds (Target met).</p>
+                <button class="bg-red-200 text-red-800 text-xs px-2 py-1 rounded mt-2 hover:bg-red-300" onclick="alert('Word added to Review List!')">
+                    + Save 'extensive' to Review List (FR8)
+                </button>
+            `;
+        }
+        
+        // --- Expose functions to the global scope for use in inline event handlers (HTML) ---
+        window.app = {
+            setView,
+            handleLogin,
+            showFeedback
+        };
+
+        // Initialize on load
+        initializeFirebase();
+    </script>
+</body>
+</html>
