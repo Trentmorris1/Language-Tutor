@@ -1,7 +1,7 @@
 # -----------------------------
 # Python cache and build files
 # -----------------------------
-__pycache__/
+tutor_app/__pycache__/
 *.py[cod]
 *.pyo
 *.pyd
@@ -58,7 +58,7 @@ config.json
 # -----------------------------
 # LanguageTool (offline)
 # -----------------------------
-languagetool/
+tutor_app/languagetool/LanguageTool-6.6/
 *.pyc
 *.pyo
 *.pyd
