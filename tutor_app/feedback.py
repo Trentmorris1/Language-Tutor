@@ -1,18 +1,20 @@
 import language_tool_python
-from flask import Blueprint, Flask, render_template, request
 
-bp = Blueprint('feedback', __name__, url_prefix='/feedback')
-tool = language_tool_python('en-US')
 
-@bp.route('/test', methods = ['GET', 'POST'])
-def test():
-    results = None
-    if request.method == 'POST':
-        text = request.form.get('text', '')
-
-    if text:
-        matches = tool.check(text)
+class FeedbackModule():
+    def __init__(self):
+        self.tool = language_tool_python.LanguageTool('en-US') #tool to be used for grammar analysis
+        self.input_text = '' #this will be for the text that was last analyzed
+        self.matches = []  
         
+        self.feedback = [] #this will be the list of fixes to give back
+        self.error_cnt = 0 #holds the total number of errors 
+        self.error_types = {} #holds counts of the types of errors: Grammar, Style, Typo
+    
+    def analyze(self, text):
+        self.input_text = text
+        self.matches = self.tool.check(text)
+        return len(self.matches)
     
 
     
