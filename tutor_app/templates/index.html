@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Language Tutor - AI-Assisted Learning (Flask/SQLite)</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Configure Tailwind to use Inter font and custom colors -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'primary': '#0056b3', // Deep Blue
+                        'secondary': '#00a8e8', // Light Blue
+                        'accent': '#ffc107', // Gold/Amber for accents
+                        'background': '#f4f7f9',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom styles for better aesthetics */
+        body {
+            background-color: #f4f7f9;
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+        }
+        .card {
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+        .btn-primary {
+            transition: transform 0.1s ease, background-color 0.1s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body class="flex flex-col">
+
+    <!-- Header (Always visible) -->
+    <header class="bg-primary text-white p-4 shadow-lg sticky top-0 z-10">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <h1 class="text-3xl font-extrabold tracking-tight">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 inline-block mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                </svg>
+                Language Tutor <span class="hidden sm:inline text-sm font-light">| AI-Assisted Learning</span>
+            </h1>
+            <div id="auth-status" class="text-right text-sm">
+                <!-- User ID/Login Status will be displayed here -->
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow p-4 sm:p-8">
+        <div class="max-w-4xl mx-auto">
+            <div id="app-container" class="bg-white card rounded-xl p-6 sm:p-10">
+                <!-- Content will be rendered here based on the 'view' state -->
+                <div class="text-center p-8">
+                    <p class="text-primary font-semibold">Loading Application...</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white p-4 text-center text-xs">
+        <p>Technical Documentation: CS 360 Language Tutor | Backend: Flask & SQLite</p>
+        <p id="app-info"></p>
+    </footer>
+
+    <!-- Application Logic -->
+    <script type="module">
+        // Base URL for the Flask API
+        const API_BASE_URL = 'http://localhost:5000'; // Flask runs on port 5000
+
+        // --- Application State and Initialization ---
+        
+        let appState = {
+            view: 'login', // 'login', 'register', 'dashboard', 'practice_setup', 'exercise'
+            language: 'English',
+            proficiency: 'Intermediate',
+            userName: 'Guest',
+            userId: null,
+            isLoggedIn: false,
+            authError: null
+        };
+
+        const appContainer = document.getElementById('app-container');
+        const authStatusElement = document.getElementById('auth-status');
+
+        /**
+         * Initializes the app by checking for a stored session.
+         */
+        function initializeApp() {
+            // Check localStorage for a persisted session (mocking a cookie)
+            appState.userId = localStorage.getItem('userId');
+            appState.userName = localStorage.getItem('userName') || 'Guest';
+            appState.language = localStorage.getItem('language') || 'English';
+            appState.proficiency = localStorage.getItem('proficiency') || 'Intermediate';
+            appState.isLoggedIn = !!appState.userId; // true if userId exists
+
+            if (appState.isLoggedIn) {
+                appState.view = 'dashboard';
+            } else {
+                appState.view = 'login';
+            }
+            document.getElementById('app-info').textContent = appState.isLoggedIn ? `Logged in as: ${appState.userName}` : 'Please Log In.';
+            renderApp();
+        }
+
+        // --- Utility Functions ---
+
+        /**
+         * Renders the current view based on appState.view.
+         */
+        function renderApp() {
+            // Determine if we should show the dashboard or force login
+            if (!appState.isLoggedIn) {
+                appState.view = (appState.view === 'register') ? 'register' : 'login';
+            } else if (appState.view === 'login' || appState.view === 'register') {
+                appState.view = 'dashboard';
+            }
+
+            authStatusElement.innerHTML = appState.isLoggedIn
+                ? `
+                    <p class="font-bold">Welcome, ${appState.userName}</p>
+                    <button onclick="window.app.handleLogout()" class="text-accent text-xs hover:underline">Log Out</button>
+                    <p class="text-xs text-gray-400">User ID: ${appState.userId}</p>
+                  `
+                : `<button onclick="window.app.setView('login')" class="bg-accent text-gray-800 px-3 py-1 rounded-lg font-bold hover:bg-yellow-400">Log In / Register</button>`;
+
+            // Render the specific view
+            switch (appState.view) {
+                case 'login':
+                    appContainer.innerHTML = renderLogin();
+                    break;
+                case 'register':
+                    appContainer.innerHTML = renderLogin(true);
+                    break;
+                case 'dashboard':
+                    appContainer.innerHTML = renderDashboard();
+                    break;
+                case 'practice_setup':
+                    appContainer.innerHTML = renderPracticeSetup();
+                    break;
+                case 'exercise':
+                    appContainer.innerHTML = renderExercise();
+                    break;
+                default:
+                    appContainer.innerHTML = renderLogin();
+            }
+        }
+
+        /**
+         * Updates the application state and re-renders the UI.
+         */
+        function setView(newView) {
+            appState.view = newView;
+            appState.authError = null; // Clear error on view change
+            renderApp();
+        }
+
+        /**
+         * Clears all session data and logs the user out.
+         */
+        function handleLogout() {
+            localStorage.clear();
+            appState.isLoggedIn = false;
+            appState.userId = null;
+            appState.userName = 'Guest';
+            setView('login');
+        }
+
+        // --- Authentication Backend Logic (Fetching Flask Endpoints) ---
+
+        /**
+         * Handles user registration (calls /register endpoint).
+         */
+        async function handleRegister(form) {
+            const email = form.elements['login-email'].value;
+            const password = form.elements['login-password'].value;
+            const username = form.elements['login-username'].value;
+            appState.authError = null;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password, username })
+                });
+                
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    // Registration successful, prompt user to login
+                    appState.authError = 'Registration successful! Please log in.';
+                    setView('login');
+                } else {
+                    appState.authError = result.message || 'Registration failed due to server error.';
+                    renderApp();
+                }
+            } catch (error) {
+                console.error("Network or parsing error during registration:", error);
+                appState.authError = 'Could not connect to the backend server (Flask). Please ensure app.py is running on port 5000.';
+                renderApp();
+            }
+        }
+
+        /**
+         * Handles user sign-in (calls /login endpoint).
+         */
+        async function handleLogin(form) {
+            const email = form.elements['login-email'].value;
+            const password = form.elements['login-password'].value;
+            appState.authError = null;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    // Store session data in localStorage (FR6)
+                    localStorage.setItem('userId', result.user_id);
+                    localStorage.setItem('userName', result.username);
+                    localStorage.setItem('language', result.language);
+                    localStorage.setItem('proficiency', result.proficiency);
+
+                    appState.userId = result.user_id;
+                    appState.userName = result.username;
+                    appState.language = result.language;
+                    appState.proficiency = result.proficiency;
+                    appState.isLoggedIn = true;
+                    setView('dashboard');
+                } else {
+                    appState.authError = result.message || 'Login failed.';
+                    renderApp();
+                }
+            } catch (error) {
+                console.error("Network or parsing error during login:", error);
+                appState.authError = 'Could not connect to the backend server (Flask). Please ensure app.py is running on port 5000.';
+                renderApp();
+            }
+        }
+
+        // --- Settings Update Backend Logic ---
+
+        async function handleSettingsUpdate() {
+            const newLanguage = document.getElementById('language-select').value;
+            const newProficiency = document.getElementById('proficiency-select').value;
+
+            if (!appState.isLoggedIn) {
+                alert('Please log in to save your settings.');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/profile/${appState.userId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ language: newLanguage, proficiency: newProficiency })
+                });
+
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    // Update client-side state and localStorage (FR1)
+                    appState.language = newLanguage;
+                    appState.proficiency = newProficiency;
+                    localStorage.setItem('language', newLanguage);
+                    localStorage.setItem('proficiency', newProficiency);
+
+                    // Provide visual feedback
+                    const button = document.querySelector('button[onclick*="handleSettingsUpdate"]');
+                    button.textContent = 'Settings Saved!';
+                    setTimeout(() => {
+                         button.textContent = 'Save Settings & Continue';
+                         window.app.setView('dashboard');
+                    }, 1000);
+                } else {
+                    alert(`Failed to save settings: ${result.message}`);
+                }
+            } catch (error) {
+                console.error("Network or parsing error during profile update:", error);
+                alert('Could not connect to the backend to save settings.');
+            }
+        }
+
+        // --- View Rendering Functions ---
+
+        function renderLogin(isRegister = false) {
+            return `
+                <div class="text-center p-8">
+                    <h2 class="text-3xl font-bold text-primary mb-6">${isRegister ? 'Create Your Account' : 'Welcome Back'}</h2>
+                    <p class="text-gray-600 mb-8">
+                        ${isRegister ? 'Sign up to begin your personalized language journey.' : 'Sign in to track your progress and resume practice.'}
+                    </p>
+                    
+                    ${appState.authError ? `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 rounded-lg">${appState.authError}</div>` : ''}
+
+                    <form onsubmit="event.preventDefault(); window.app.${isRegister ? 'handleRegister' : 'handleLogin'}(this);" class="max-w-sm mx-auto space-y-4">
+                        ${isRegister ? `
+                            <input type="text" id="login-username" name="login-username" placeholder="Full Name (for your profile)" required 
+                               class="w-full p-3 border border-gray-300 rounded-lg focus:ring-secondary focus:border-secondary">
+                        ` : ''}
+                        <input type="email" id="login-email" name="login-email" placeholder="Email Address" required 
+                               class="w-full p-3 border border-gray-300 rounded-lg focus:ring-secondary focus:border-secondary">
+                        <input type="password" id="login-password" name="login-password" placeholder="Password" required 
+                               class="w-full p-3 border border-gray-300 rounded-lg focus:ring-secondary focus:border-secondary">
+                        <button type="submit" class="w-full btn-primary bg-secondary text-white p-3 rounded-lg font-semibold shadow-md">
+                            ${isRegister ? 'Register & Start Learning' : 'Log In & Continue'}
+                        </button>
+                    </form>
+                    
+                    <div class="mt-6">
+                        <button onclick="window.app.setView('${isRegister ? 'login' : 'register'}')" class="text-sm text-primary hover:underline">
+                            ${isRegister ? 'Already have an account? Log In' : 'Need an account? Register Here'}
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderDashboard() {
+            return `
+                <div class="space-y-8">
+                    <h2 class="text-3xl font-bold text-primary">Hello, ${appState.userName}!</h2>
+                    <p class="text-gray-600">Your current settings: **${appState.language}**, **${appState.proficiency}** level.</p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+                        <div class="bg-background p-6 rounded-xl border-t-4 border-secondary shadow-inner">
+                            <p class="text-4xl font-extrabold text-secondary">85%</p>
+                            <p class="text-sm text-gray-600 mt-2">Grammar Accuracy (FR4)</p>
+                        </div>
+                        <div class="bg-background p-6 rounded-xl border-t-4 border-secondary shadow-inner">
+                            <p class="text-4xl font-extrabold text-secondary">+124</p>
+                            <p class="text-sm text-gray-600 mt-2">Vocabulary Growth (FR4)</p>
+                        </div>
+                        <div class="bg-background p-6 rounded-xl border-t-4 border-secondary shadow-inner">
+                            <p class="text-4xl font-extrabold text-secondary">B2</p>
+                            <p class="text-sm text-gray-600 mt-2">Current Fluency Level</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <button onclick="window.app.setView('practice_setup')"
+                                class="btn-primary bg-primary text-white p-5 rounded-xl font-semibold text-lg shadow-lg flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l2 5m-2-5l-5 2" />
+                            </svg>
+                            Start New Practice (FR2)
+                        </button>
+                        <button onclick="window.app.setView('custom_upload')"
+                                class="btn-primary bg-accent text-gray-800 p-5 rounded-xl font-semibold text-lg shadow-lg flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                            </svg>
+                            Upload Custom Content (FR5)
+                        </button>
+                    </div>
+
+                    <div class="bg-gray-100 p-5 rounded-xl border border-gray-200">
+                        <h3 class="text-xl font-semibold text-gray-800">Review List (FR8)</h3>
+                        <ul class="list-disc list-inside mt-2 text-gray-700">
+                            <li>Affect / Effect</li>
+                            <li>Apathetic (Common Error)</li>
+                            <li>Derelict (New Vocabulary)</li>
+                        </ul>
+                        <a href="#" class="text-primary hover:underline mt-2 inline-block text-sm">View full list</a>
+                    </div>
+
+                </div>
+            `;
+        }
+
+        function renderPracticeSetup() {
+            return `
+                <div class="space-y-6">
+                    <h2 class="text-3xl font-bold text-primary">Set Up Practice Session</h2>
+                    <p class="text-gray-600">Select your target language and proficiency level to personalize the exercises (FR1).</p>
+                    
+                    <div class="space-y-4 max-w-lg">
+                        <div>
+                            <label for="language-select" class="block text-sm font-medium text-gray-700 mb-1">Target Language:</label>
+                            <select id="language-select" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                                <option ${appState.language === 'English' ? 'selected' : ''}>English</option>
+                                <option ${appState.language === 'Spanish' ? 'selected' : ''}>Spanish</option>
+                                <option ${appState.language === 'French' ? 'selected' : ''}>French</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label for="proficiency-select" class="block text-sm font-medium text-gray-700 mb-1">Proficiency Level:</label>
+                            <select id="proficiency-select" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                                <option ${appState.proficiency === 'Beginner' ? 'selected' : ''}>Beginner</option>
+                                <option ${appState.proficiency === 'Intermediate' ? 'selected' : ''}>Intermediate</option>
+                                <option ${appState.proficiency === 'Advanced' ? 'selected' : ''}>Advanced</option>
+                            </select>
+                        </div>
+
+                        <div class="pt-4">
+                            <button onclick="window.app.handleSettingsUpdate()" 
+                                    class="w-full btn-primary bg-primary text-white p-4 rounded-xl font-semibold text-lg shadow-md mb-2">
+                                Save Settings & Continue
+                            </button>
+                            <button onclick="window.app.setView('exercise')" 
+                                    class="w-full btn-primary bg-secondary text-white p-4 rounded-xl font-semibold text-lg shadow-md">
+                                Start Writing Composition
+                            </button>
+                        </div>
+                    </div>
+                    <button onclick="window.app.setView('dashboard')" class="text-primary hover:underline mt-4">
+                        &larr; Back to Dashboard
+                    </button>
+                </div>
+            `;
+        }
+        
+        function renderExercise() {
+            return `
+                <div class="space-y-6">
+                    <h2 class="text-3xl font-bold text-primary">Interactive Writing Exercise</h2>
+                    <p class="text-sm text-secondary font-semibold">Language: ${appState.language} | Level: ${appState.proficiency}</p>
+
+                    <div class="bg-background p-6 rounded-xl border border-gray-300">
+                        <p class="font-medium text-lg mb-4">Prompt:</p>
+                        <p class="text-gray-700">Describe the challenges and opportunities presented by artificial intelligence in the field of education. Write at least 150 words.</p>
+                    </div>
+
+                    <div>
+                        <label for="user-input" class="block text-lg font-medium text-gray-700 mb-2">Your Composition (FR2):</label>
+                        <textarea id="user-input" rows="8" placeholder="Type your response here..." 
+                                  class="w-full p-4 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"></textarea>
+                    </div>
+
+                    <div class="flex justify-between items-center">
+                        <button onclick="window.app.showFeedback()" 
+                                class="btn-primary bg-primary text-white p-3 rounded-xl font-semibold shadow-md">
+                            Submit & Get AI Feedback (FR3)
+                        </button>
+                        <p id="latency-tip" class="text-xs text-gray-500">Target feedback latency: &lt;5 seconds.</p>
+                    </div>
+
+                    <div id="ai-feedback" class="hidden bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-lg">
+                        <!-- AI Feedback will be injected here -->
+                    </div>
+                    
+                    <button onclick="window.app.setView('dashboard')" class="text-primary hover:underline mt-4">
+                        &larr; Finish Session
+                    </button>
+                </div>
+            `;
+        }
+
+        function showFeedback() {
+            // Mock feedback function, unrelated to Flask API
+            const feedbackElement = document.getElementById('ai-feedback');
+            feedbackElement.classList.remove('hidden', 'bg-red-50', 'border-red-500', 'text-red-700');
+            feedbackElement.classList.add('bg-green-50', 'border-green-500', 'text-green-700');
+
+            feedbackElement.innerHTML = `
+                <h3 class="font-bold text-lg mb-2">AI-Powered Correction & Guidance (FR3)</h3>
+                <p><strong>Grammar Error Detected:</strong> "The data is analyzed." &rarr; Correction: "The data <span class="font-bold">are</span> analyzed." (Explanation: Data is a plural noun).</p>
+                <p class="mt-2"><strong>Vocabulary Suggestion:</strong> Consider replacing "very big" with the more precise term "extensive" or "massive."</p>
+                <p class="mt-2 text-sm text-gray-600">Feedback delivered in 1.2 seconds (Target met - Non-Functional Requirement).</p>
+                <button class="bg-green-200 text-green-800 text-xs px-2 py-1 rounded mt-2 hover:bg-green-300" onclick="alert('Word added to Review List!')">
+                    + Save 'extensive' to Review List (FR8)
+                </button>
+            `;
+        }
+        
+        // --- Expose functions to the global scope for use in inline event handlers (HTML) ---
+        window.app = {
+            setView,
+            handleLogin,
+            handleRegister,
+            handleLogout,
+            handleSettingsUpdate,
+            showFeedback
+        };
+
+        // Initialize on load
+        initializeApp();
+    </script>
+</body>
+</html>
+
