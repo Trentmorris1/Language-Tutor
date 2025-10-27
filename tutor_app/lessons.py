@@ -1,42 +1,74 @@
-# lessons.py
-class Lessons:
-    def __init__(self):
-        # List of questions
-        self.questions = [
-            "1. What is your favorite animal and why?",
-            "2. If you could travel anywhere in the world, where would you go?",
-            "3. What’s one skill you’d love to learn this year?",
-            "4. Who inspires you the most?",
-            "5. If you could have any superpower, what would it be and why?"
-        ]
-        # Empty list to store user answers
-        self.user_answers = []
+# tutorapp/lessons.py
+# Handles exercise creation and routes for the learning section.
 
-    def ask_questions(self):
-        """Ask all questions in order and collect user answers."""
-        print("Welcome! Please answer the following questions:\n")
+from flask import Blueprint, render_template, request, redirect, url_for, session
+from .learning_facade import LearningFacade
 
-        for question in self.questions:
-            print(question)
-            answer = input("Your answer: ")
-            self.user_answers.append(answer)
+bp = Blueprint("lessons", __name__, url_prefix="/lessons")
 
-        print("\nThanks for answering all the questions!")
-        self.display_answers()
+# ------------------ FACTORY PATTERN ------------------ #
 
-    def display_answers(self):
-        """Display the collected answers."""
-        print("Here are your responses:")
-        for i, answer in enumerate(self.user_answers, start=1):
-            print(f"Q{i}: {answer}")
-
-    def get_answers(self):
-        """Return the list of collected answers (for database comparison)."""
-        return self.user_answers
+class Exercise:
+    """Abstract base class for all exercises."""
+    def __init__(self, id, type, difficulty):
+        self.id = id
+        self.type = type
+        self.difficulty = difficulty
 
 
-# Example usage (uncomment this to run directly):
-# if __name__ == "__main__":
-#     lesson = Lessons()
-#     lesson.ask_questions()
-#     print("Collected Answers:", lesson.get_answers())
+class ReadingExercise(Exercise):
+    """Concrete exercise type for reading."""
+    def __init__(self, id, difficulty, reading):
+        super().__init__(id, "reading", difficulty)
+        self.reading = reading
+
+    def presentReading(self):
+        return f"Read this passage: {self.reading}"
+
+
+class WritingExercise(Exercise):
+    """Concrete exercise type for writing."""
+    def __init__(self, id, difficulty, prompt):
+        super().__init__(id, "writing", difficulty)
+        self.prompt = prompt
+
+    def presentPrompt(self):
+        return f"Write a response to: {self.prompt}"
+
+
+class ExerciseFactory:
+    """Creates exercise objects depending on the type requested."""
+    def __init__(self, defaultDifficulty="medium"):
+        self.defaultDifficulty = defaultDifficulty
+
+    def createExercise(self, exercise_type, **kwargs):
+        if exercise_type == "reading":
+            return ReadingExercise(kwargs.get("id", 0),
+                                   kwargs.get("difficulty", self.defaultDifficulty),
+                                   kwargs.get("reading", "Default passage"))
+        elif exercise_type == "writing":
+            return WritingExercise(kwargs.get("id", 0),
+                                   kwargs.get("difficulty", self.defaultDifficulty),
+                                   kwargs.get("prompt", "Write something about your day."))
+        else:
+            raise ValueError(f"Unknown exercise type: {exercise_type}")
+# ------------------------------------------------------ #
+
+# Flask routes that use the facade
+@bp.route("/")
+def index():
+    return render_template("lessons/index.html")
+
+@bp.route("/exercise/<etype>")
+def get_exercise(etype):
+    facade = LearningFacade(session.get("user_id", 1))
+    content = facade.requestExercise(etype)
+    return render_template("lessons/exercise.html", content=content, etype=etype)
+
+@bp.route("/submit/<etype>", methods=["POST"])
+def submit_answer(etype):
+    facade = LearningFacade(session.get("user_id", 1))
+    answer = request.form["answer"]
+    feedback = facade.submitAnswer(etype, answer)
+    return render_template("lessons/result.html", feedback=feedback)
+
