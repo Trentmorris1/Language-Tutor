@@ -71,4 +71,3 @@ def submit_answer(etype):
     answer = request.form["answer"]
     feedback = facade.submitAnswer(etype, answer)
     return render_template("lessons/result.html", feedback=feedback)
-

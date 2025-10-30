@@ -1,8 +1,8 @@
 # tutorapp/__init__.py
 import os
-from flask import Flask
+from flask import Flask, render_template
 from flask_cors import CORS
-
+from . import db
 from .db import init_db, close_db
 
 
@@ -28,5 +28,15 @@ def create_app():
         app.register_blueprint(auth.bp)
     except ImportError:
         pass
+
+    @app.cli.command('init-db')
+    def init_db_command():
+        """Initialize the database (create tables)."""
+        db.init_db()
+        print('Database initialized.')
+
+    @app.route('/')
+    def index():
+        return render_template('index.html')
 
     return app

@@ -51,4 +51,14 @@ def init_db():
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     ''')
+    db.execute('''
+        CREATE TABLE IF NOT EXISTS questions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type TEXT NOT NULL CHECK(type IN ('reading', 'writing')),
+        prompt TEXT NOT NULL,
+        correct_answer TEXT
+        )
+    ''')
+
     db.commit()
+
