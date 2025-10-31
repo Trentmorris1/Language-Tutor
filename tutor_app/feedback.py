@@ -1,34 +1,74 @@
+# tutorapp/feedback.py
 import language_tool_python, os, time, subprocess
 
-class FeedbackModule():
+_feedback_instance = None  # singleton instance
+
+
+def get_feedback_instance():
+    """Return a single shared FeedbackModule (singleton pattern)."""
+    global _feedback_instance
+    if _feedback_instance is None:
+        print('Launching LanguageTool local server...')
+        _feedback_instance = FeedbackModule()
+    return _feedback_instance
+
+
+class FeedbackModule:
     def __init__(self):
-        self.input_text = '' #this will be for the text that was last analyzed
-        self.matches = []  
-        
-        self.feedback = [] #this will be the list of fixes to give back
-        self.error_cnt = 0 #holds the total number of errors 
-        self.error_types = {} #holds counts of the types of errors: Grammar, Style, Typo
+        self.input_text = ''
+        self.matches = []
+        self.error_cnt = 0
+        self.error_types = {}
+        self.feedback = []
 
-        self.server_port = 8081 #just hardcoding this port, we can pass in a port later if needed
+        self.server_port = 8081
 
-        #defining path to the languagetool jar dynamically based on where each person has it
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        jar_path = os.path.join(script_dir, 'languagetool', 'LanguageTool-6.6', 'languagetool-server.jar')
+        # --- Dynamically locate the LanguageTool JAR ---
+        jar_dir = os.path.dirname(os.path.abspath(__file__))
+        jar_path = os.path.join(jar_dir, 'languagetool', 'LanguageTool-6.6', 'languagetool-server.jar')
 
-        subprocess.Popen(['java', '-jar', jar_path, '--port', str(self.server_port)],    #starting the server
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) #these just get rid of the output
-        time.sleep(5) #give the server a little time to start before attempting to connect to it
+        # --- Start server once ---
+        subprocess.Popen(
+            ['java', '-jar', jar_path, '--port', str(self.server_port)],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        time.sleep(5)  # give server time to start
 
-        #finally time to connect the tool to the server so we can use it
+        # --- Connect to it ---
         self.tool = language_tool_python.LanguageTool(
             'en-US',
             remote_server=f'http://localhost:{self.server_port}'
         )
 
-    def analyze(self, text):
+    def analyze_text(self, text):
+        """Analyze the given text and return structured feedback."""
         self.input_text = text
         self.matches = self.tool.check(text)
-        return len(self.matches)
+
+        self.error_cnt = len(self.matches)
+        self.feedback = []
+
+        #breakdown by category
+        self.error_types = {'Grammar': 0, 'Style': 0, 'Typo': 0}
+
+        for match in self.matches:
+            category = match.ruleIssueType.capitalize()
+            if category in self.error_types:
+                self.error_types[category] += 1
+
+            self.feedback.append({
+                'message': match.message,
+                'suggestions': match.replacements,
+                'offset': match.offset,
+                'error_text': text[match.offset: match.offset + match.errorLength]
+            })
+
+        return {
+            'error_count': self.error_cnt,
+            'error_types': self.error_types,
+            'feedback': self.feedback
+        }
+
     
 
     

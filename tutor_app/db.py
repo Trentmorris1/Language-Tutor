@@ -3,14 +3,22 @@ import sqlite3
 from flask import current_app, g
 
 def get_db():
-    """Opens a new database connection if there is none yet for the current application context."""
-    if 'db' not in g:
-        g.db = sqlite3.connect(
-            current_app.config['DATABASE'],
-            detect_types=sqlite3.PARSE_DECLTYPES
-        )
-        g.db.row_factory = sqlite3.Row  # Allows accessing columns by name
-    return g.db
+    """Get a database connection that works both inside and outside Flask."""
+    try:
+        # --- When inside Flask app context ---
+        if 'db' not in g:
+            g.db = sqlite3.connect(
+                current_app.config['DATABASE'],
+                detect_types=sqlite3.PARSE_DECLTYPES
+            )
+            g.db.row_factory = sqlite3.Row
+        return g.db
+
+    except RuntimeError:
+        # --- When running standalone (no Flask app context) ---
+        db = sqlite3.connect("instance/language_tutor.db")
+        db.row_factory = sqlite3.Row
+        return db
 
 def close_db(e=None):
     """Closes the database connection."""
@@ -56,6 +64,7 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         type TEXT NOT NULL CHECK(type IN ('reading', 'writing')),
         prompt TEXT NOT NULL,
+        options TEXT, 
         correct_answer TEXT
         )
     ''')
