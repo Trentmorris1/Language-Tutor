@@ -5,6 +5,9 @@ body {
     padding: 0;
     background-color: #f4f4f4;
     color: #333;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 header {
@@ -67,8 +70,8 @@ nav a:hover {
 }
 
 main {
-    width: 75%;
-    padding-left: 20px;
+    width: 100%;
+    max-width: 900px;
 }
 
 section {

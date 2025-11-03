@@ -27,7 +27,7 @@ def register():
         user_id = cursor.lastrowid
         cursor.execute(
             'INSERT INTO profiles (user_id, username, language, proficiency) VALUES (?, ?, ?, ?)',
-            (user_id, username, 'English', 'Intermediate')
+            (user_id, username, 'English', 'Intermediate')  # Default values for backward compatibility
         )
         db.commit()
         return jsonify({'success': True, 'message': 'Registration successful. Please log in.'})
@@ -57,7 +57,27 @@ def login():
         'success': True,
         'message': 'Login successful.',
         'user_id': user['id'],
-        'username': profile['username'],
-        'language': profile['language'],
-        'proficiency': profile['proficiency']
+        'username': profile['username']
     })
+
+@bp.route('/api/profile/<int:user_id>', methods=['POST'])
+def update_profile(user_id):
+    """Update user profile settings (language and proficiency)."""
+    data = request.get_json()
+    language = data.get('language')
+    proficiency = data.get('proficiency')
+    
+    if not language or not proficiency:
+        return jsonify({'success': False, 'message': 'Missing language or proficiency.'}), 400
+    
+    db = get_db()
+    try:
+        db.execute(
+            'UPDATE profiles SET language = ?, proficiency = ? WHERE user_id = ?',
+            (language, proficiency, user_id)
+        )
+        db.commit()
+        return jsonify({'success': True, 'message': 'Profile updated successfully.'})
+    except Exception as e:
+        db.rollback()
+        return jsonify({'success': False, 'message': f'Database error: {str(e)}'}), 500

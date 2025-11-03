@@ -58,17 +58,59 @@ class WritingExercise:
 
     
 class ExerciseFactory:
+    @staticmethod
     def create_exercise(exercise_type, data):
+        """
+        Create an exercise object from database row data.
+        
+        Args:
+            exercise_type: 'reading' or 'writing'
+            data: SQLite Row object with fields: id, type, prompt, options, correct_answer
+        """
         if exercise_type == 'reading':
+            # Convert SQLite Row to dict for safer access
+            # SQLite Row objects support dict() conversion
+            if hasattr(data, 'keys'):
+                row_dict = dict(data)
+            else:
+                row_dict = data
+            
+            # Access fields - these should exist in the database
+            prompt = row_dict.get('prompt')
+            correct_answer = row_dict.get('correct_answer')
+            options_str = row_dict.get('options')
+            
+            if not prompt:
+                raise ValueError('Missing required field: prompt')
+            if not correct_answer:
+                raise ValueError('Missing required field: correct_answer')
+            
+            # Handle None or empty options - ensure it's always a string before splitting
+            if options_str is None or options_str == '':
+                options_list = []
+            else:
+                # Convert to string and split by pipe character
+                options_str = str(options_str)
+                # Split and clean up each option
+                options_list = [opt.strip() for opt in options_str.split('|') if opt.strip()]
+            
             return ReadingExercise(
-                question=data['prompt'],
-                options=data['options'].split('|'),
-                answer=data['correct_answer']
+                question=prompt,
+                options=options_list,
+                answer=correct_answer
             )
         elif exercise_type == 'writing':
-            return WritingExercise(
-                prompt=data['prompt']
-            )
+            # Convert SQLite Row to dict for safer access
+            if hasattr(data, 'keys'):
+                row_dict = dict(data)
+            else:
+                row_dict = data
+            
+            prompt = row_dict.get('prompt')
+            if not prompt:
+                raise ValueError('Missing required field: prompt')
+            
+            return WritingExercise(prompt=prompt)
         else:
             raise ValueError(f'Unsupported exercise type: {exercise_type}')
 

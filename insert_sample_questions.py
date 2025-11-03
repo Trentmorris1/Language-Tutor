@@ -39,6 +39,13 @@ def insert_questions():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
+    # Insert reading questions (type, prompt, options, correct_answer)
+    cursor.executemany('''
+        INSERT INTO questions (type, prompt, options, correct_answer)
+        VALUES (?, ?, ?, ?)
+    ''', SAMPLE_READING_QUESTIONS)
+
+    # Insert writing questions (type, prompt)
     cursor.executemany('''
         INSERT INTO questions (type, prompt)
         VALUES (?, ?)
@@ -46,7 +53,7 @@ def insert_questions():
 
     conn.commit()
     conn.close()
-    print(f"Inserted questions into {DB_PATH}")
+    print(f"Inserted {len(SAMPLE_READING_QUESTIONS)} reading and {len(SAMPLE_WRITING_QUESTIONS)} writing questions into {DB_PATH}")
 
 if __name__ == "__main__":
     insert_questions()

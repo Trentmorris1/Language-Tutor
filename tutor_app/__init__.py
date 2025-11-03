@@ -28,6 +28,12 @@ def create_app():
         app.register_blueprint(auth.bp)
     except ImportError:
         pass
+    
+    try:
+        from . import exercises
+        app.register_blueprint(exercises.bp)
+    except ImportError:
+        pass
 
     @app.cli.command('init-db')
     def init_db_command():
