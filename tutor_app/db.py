@@ -30,7 +30,7 @@ def init_db():
     """Clear existing data and create new tables (same SQL as original app.py)."""
     db = get_db()
     
-    # 1. Users Table (for authentication)
+    # 1. Users Table 
     db.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -39,7 +39,7 @@ def init_db():
         )
     ''')
     
-    # 2. Profiles Table (for FR1: Language and Proficiency settings)
+    # 2. Profiles Table 
     db.execute('''
         CREATE TABLE IF NOT EXISTS profiles (
             user_id INTEGER PRIMARY KEY,
@@ -50,7 +50,7 @@ def init_db():
         )
     ''')
 
-    # 3. Review List (for FR8: Difficult words - simple structure)
+    # 3. Review List 
     db.execute('''
         CREATE TABLE IF NOT EXISTS review_list (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,15 +59,33 @@ def init_db():
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     ''')
+
+    # 4. Exercises Table 
     db.execute('''
-        CREATE TABLE IF NOT EXISTS questions (
+        CREATE TABLE IF NOT EXISTS exercises (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         type TEXT NOT NULL CHECK(type IN ('reading', 'writing')),
-        prompt TEXT NOT NULL,
-        options TEXT, 
-        correct_answer TEXT
+        prompt TEXT NOT NULL
         )
     ''')
+
+    # 5. Progress Table
+    db.execute('''
+        CREATE TABLE IF NOT EXISTS progress (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            reading_ex_errors INTEGER DEFAULT 0,
+            reading_ex_words INTEGER DEFAULT 0,
+            writing_ex_errors INTEGER DEFAULT 0,
+            writing_ex_words INTEGER DEFAULT 0,
+            total_errors INTEGER DEFAULT 0,
+            total_words INTEGER DEFAULT 0,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+                ON DELETE CASCADE
+                ON UPDATE CASCADE
+        )
+    ''')
+
 
     db.commit()
 

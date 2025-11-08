@@ -1,60 +1,110 @@
-# tutorapp/progress.py
-# This module implements the Observer pattern to track user progress updates.
+# tutor_app/progress.py
+
+class Subject:
+    def __init__(self):
+        self._observers = set()
+
+    def attach(self, observer):
+        self._observers.add(observer)
+
+    def detach(self, observer):
+        self._observers.discard(observer)
+
+    def notify(self, data):
+        for observer in self._observers:
+            observer.update(data)
+
 
 class Observer:
-    """Abstract base class for any object that wants to be notified of progress changes."""
     def update(self, data):
         raise NotImplementedError
 
 
-class ProgressTracker:
-    """
-    Subject class in the Observer pattern.
-    It maintains a list of observers (like Dashboard, ReviewList, FeedbackModule)
-    and notifies them when progress data changes.
-    """
-    def __init__(self, user_id):
+class ProgressTracker(Observer):
+    def __init__(self, db=None, user_id=None):
+        self.db = db
         self.user_id = user_id
-        self.progressData = {}  # holds progress metrics like {"writing": 0.85}
-        self.observers = []     # list of registered observer objects
-
-    def attach(self, observer):
-        """Registers a new observer."""
-        self.observers.append(observer)
-
-    def detach(self, observer):
-        """Unregisters an observer."""
-        self.observers.remove(observer)
-
-    def notify(self):
-        """Calls update() on all observers when data changes."""
-        for observer in self.observers:
-            observer.update(self.progressData)
-
-    def updateProgress(self, exercise_type, score):
-        """Updates progress for a given exercise and notifies observers."""
-        self.progressData[exercise_type] = score
-        self.notify()
-
-
-# Example concrete observers:
-class Dashboard(Observer):
-    """Updates the dashboard with current progress data."""
-    def __init__(self):
-        self.displayData = {}
 
     def update(self, data):
-        self.displayData = data
-        print(f"[Dashboard] Progress updated: {data}")
+        #observer update method for when an exercise is complete
+        ex_type = data['type']
+        result = data['result']
+        text = data['text']
+
+        #extract error & word counts
+        errors = result.get('error_count', 0)
+        words = max(len(text.split()), 1)
+
+        #update the progress totals
+        self.update_db(ex_type, errors, words)
 
 
-class ReviewList(Observer):
-    """Tracks words or exercises the user struggles with."""
-    def __init__(self):
-        self.difficultWords = []
 
-    def update(self, data):
-        # Example: if writing score is low, mark some area as difficult
-        if data.get("writing", 1.0) < 0.7:
-            self.difficultWords.append("verbs")
-        print(f"[ReviewList] Updated difficult words: {self.difficultWords}")
+    def update_db(self, ex_type, errors, words):
+        if not self.user_id:
+            return
+
+        cursor = self.db.cursor()
+
+        #first ensure we can insert the data
+        cursor.execute(
+            'SELECT id FROM progress WHERE user_id = ?', (self.user_id,)
+        )
+        row = cursor.fetchone()
+        if not row:
+            cursor.execute(
+                'INSERT INTO progress (user_id) VALUES (?)', (self.user_id,)
+            )
+            self.db.commit()
+        
+        #update appropriate columns in the progress table
+        if ex_type == 'reading':
+            cursor.execute('''
+            UPDATE progress
+            SET
+                reading_ex_errors = reading_ex_errors + ?,
+                reading_ex_words = reading_ex_words + ?,
+                total_errors = total_errors + ?,
+                total_words = total_words + ?
+            WHERE user_id = ?
+            ''', (errors, words, errors, words, self.user_id))
+        
+        elif ex_type == 'writing':
+            cursor.execute('''
+            UPDATE progress
+            SET 
+                writing_ex_errors = writing_ex_errors + ?,
+                writing_ex_words = writing_ex_words + ?,
+                total_errors = total_errors + ?,
+                total_words = total_words + ?
+            WHERE user_id = ?
+            ''', (errors, words, errors, words, self.user_id))
+        
+        self.db.commit()
+
+    
+    #for future progress page
+    def get_progress(self):
+        #Fetch and compute accuracy dynamically
+        cursor = self.db.execute(
+            'SELECT * FROM progress WHERE user_id = ?', (self.user_id,)
+        )
+
+        row = cursor.fetchone()
+        if not row: 
+            return None
+
+        data = dict(row) if hasattr(row, 'keys') else row
+
+        def acc(errors, words):
+            return 0.0 if words == 0 else max(0.0, 1 - (errors/ words))
+        
+        reading_acc = acc(data['reading_ex_errors'], data['reading_ex_words'])
+        writing_acc = acc(data['writing_ex_errors'], data['writing_ex_words'])
+        overall_acc = acc(data['total_errors'], data['total_words'])
+
+        return{
+            'reading_accuracy': round(reading_acc * 100, 2),
+            'writing_accuracy': round(writing_acc * 100, 2),
+            'overall_accuracy': round(overall_acc * 100, 2)
+        }

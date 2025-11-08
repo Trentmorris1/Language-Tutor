@@ -48,6 +48,10 @@ class FeedbackModule:
         self.error_cnt = len(self.matches)
         self.feedback = []
 
+        # Calculate accuracy based on word count (more meaningful than character count)
+        word_count = max(len(self.input_text.split()), 1)  # Avoid division by zero
+        self.acc = max(0.0, 1 - (self.error_cnt / word_count))
+
         #breakdown by category
         self.error_types = {'Grammar': 0, 'Style': 0, 'Typo': 0}
 
@@ -66,7 +70,8 @@ class FeedbackModule:
         return {
             'error_count': self.error_cnt,
             'error_types': self.error_types,
-            'feedback': self.feedback
+            'feedback': self.feedback,
+            'accuracy': self.acc * 100
         }
 
     

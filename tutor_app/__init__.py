@@ -8,7 +8,8 @@ from .db import init_db, close_db
 
 def create_app():
     app = Flask(__name__, instance_relative_config=True)
-    CORS(app)
+    # Enable credentials (cookies) for CORS - required for sessions
+    CORS(app, supports_credentials=True)
 
     # Set up configuration
     app.config.from_mapping(

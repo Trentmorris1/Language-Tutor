@@ -1,9 +1,19 @@
 # tutorapp/auth.py
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, session
 from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
 from .db import get_db
 
 bp = Blueprint('auth', __name__)
+
+def login_required(f):
+    """Decorator to require authentication for a route."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return jsonify({'success': False, 'message': 'Authentication required.'}), 401
+        return f(*args, **kwargs)
+    return decorated_function
 
 @bp.route('/register', methods=['POST'])
 def register():
@@ -53,6 +63,10 @@ def login():
     if profile is None:
         return jsonify({'success': False, 'message': 'Profile missing.'}), 500
 
+    # Store user_id and username in session
+    session['user_id'] = user['id']
+    session['username'] = profile['username']
+
     return jsonify({
         'success': True,
         'message': 'Login successful.',
@@ -60,24 +74,8 @@ def login():
         'username': profile['username']
     })
 
-@bp.route('/api/profile/<int:user_id>', methods=['POST'])
-def update_profile(user_id):
-    """Update user profile settings (language and proficiency)."""
-    data = request.get_json()
-    language = data.get('language')
-    proficiency = data.get('proficiency')
-    
-    if not language or not proficiency:
-        return jsonify({'success': False, 'message': 'Missing language or proficiency.'}), 400
-    
-    db = get_db()
-    try:
-        db.execute(
-            'UPDATE profiles SET language = ?, proficiency = ? WHERE user_id = ?',
-            (language, proficiency, user_id)
-        )
-        db.commit()
-        return jsonify({'success': True, 'message': 'Profile updated successfully.'})
-    except Exception as e:
-        db.rollback()
-        return jsonify({'success': False, 'message': f'Database error: {str(e)}'}), 500
+@bp.route('/logout', methods=['POST'])
+def logout():
+    """Log out the current user by clearing the session."""
+    session.clear()
+    return jsonify({'success': True, 'message': 'Logged out successfully.'})
