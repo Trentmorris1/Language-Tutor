@@ -14,7 +14,7 @@ function handleLogout() {
     apiCall('/logout', 'POST')
         .then(function(result) {
             // Clear client-side state regardless of API response
-            localStorage.clear();
+            sessionStorage.clear();
             updateState({
                 isLoggedIn: false,
                 userId: null,
@@ -27,7 +27,7 @@ function handleLogout() {
         })
         .catch(function(error) {
             // Even if API call fails, clear client-side state
-            localStorage.clear();
+            sessionStorage.clear();
             updateState({
                 isLoggedIn: false,
                 userId: null,

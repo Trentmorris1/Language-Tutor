@@ -36,6 +36,12 @@ def create_app():
     except ImportError:
         pass
 
+    try:
+        from . import progress
+        app.register_blueprint(progress.bp)
+    except ImportError:
+        pass
+
     @app.cli.command('init-db')
     def init_db_command():
         """Initialize the database (create tables)."""

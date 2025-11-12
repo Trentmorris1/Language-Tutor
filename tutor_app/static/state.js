@@ -10,9 +10,26 @@ var appState = {
     exerciseType: null,
     currentExercise: null,
     exerciseError: null,
+    overallAccuracy: 0,
 };
 
-// Updates both appState and localStorage in one operation
+var storage;
+try {
+    storage = window.sessionStorage;
+} catch (error) {
+    storage = null;
+}
+
+if (!storage) {
+    storage = {
+        getItem: function() { return null; },
+        setItem: function() {},
+        removeItem: function() {},
+        clear: function() {}
+    };
+}
+
+// Updates both appState and sessionStorage in one operation
 function updateState(updates, persist) {
     if (persist === undefined) {
         persist = true;
@@ -25,7 +42,7 @@ function updateState(updates, persist) {
         }
     }
     
-    // Persist to localStorage if requested
+    // Persist to sessionStorage if requested
     if (persist) {
         var persistableKeys = ['userId', 'userName', 'isLoggedIn'];
         for (var i = 0; i < persistableKeys.length; i++) {
@@ -33,20 +50,20 @@ function updateState(updates, persist) {
             if (updates.hasOwnProperty(key)) {
                 var value = updates[key];
                 if (value === null) {
-                    localStorage.removeItem(key);
+                    storage.removeItem(key);
                 } else {
-                    localStorage.setItem(key, value);
+                    storage.setItem(key, value);
                 }
             }
         }
     }
 }
 
-// Loads initial state from localStorage on app startup
+// Loads initial state from sessionStorage on app startup
 function loadStateFromStorage() {
-    // Load all persisted state from localStorage
-    var storedUserId = localStorage.getItem('userId');
-    var storedUserName = localStorage.getItem('userName');
+    // Load all persisted state from sessionStorage
+    var storedUserId = storage.getItem('userId');
+    var storedUserName = storage.getItem('userName');
     
     // Update appState with stored values
     var updates = {

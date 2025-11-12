@@ -1,4 +1,12 @@
+from flask import Blueprint, jsonify, session
+
+from .auth import login_required
+from .db import get_db
+
 # tutor_app/progress.py
+
+bp = Blueprint('progress', __name__)
+
 
 class Subject:
     def __init__(self):
@@ -108,3 +116,31 @@ class ProgressTracker(Observer):
             'writing_accuracy': round(writing_acc * 100, 2),
             'overall_accuracy': round(overall_acc * 100, 2)
         }
+
+
+@bp.route('/api/progress', methods=['GET'])
+@login_required
+def get_progress_route():
+    """API endpoint to fetch overall progress metrics for the authenticated user."""
+    try:
+        db = get_db()
+        user_id = session.get('user_id')
+        tracker = ProgressTracker(db, user_id)
+        progress_data = tracker.get_progress()
+
+        if progress_data is None:
+            progress_data = {
+                'overall_accuracy': 0.0,
+                'reading_accuracy': 0.0,
+                'writing_accuracy': 0.0
+            }
+
+        return jsonify({
+            'success': True,
+            'progress': progress_data
+        })
+    except Exception as exc:
+        return jsonify({
+            'success': False,
+            'message': f'Server error: {str(exc)}'
+        }), 500
