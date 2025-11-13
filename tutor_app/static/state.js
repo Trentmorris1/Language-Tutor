@@ -11,6 +11,18 @@ var appState = {
     currentExercise: null,
     exerciseError: null,
     overallAccuracy: 0,
+    readingAccuracy: 0,
+    writingAccuracy: 0,
+    errorPercentages: {
+        grammar: 0,
+        style: 0,
+        typo: 0
+    },
+    errorCounts: {
+        grammar: 0,
+        style: 0,
+        typo: 0
+    }
 };
 
 var storage;

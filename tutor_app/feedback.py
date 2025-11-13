@@ -1,7 +1,7 @@
-# tutorapp/feedback.py
+# Tutor app feedback utilities
 import language_tool_python, os, time, subprocess
 
-_feedback_instance = None  # singleton instance
+_feedback_instance = None  # Singleton instance
 
 
 def get_feedback_instance():
@@ -23,18 +23,18 @@ class FeedbackModule:
 
         self.server_port = 8081
 
-        # --- Dynamically locate the LanguageTool JAR ---
+        # Locate the LanguageTool JAR dynamically
         jar_dir = os.path.dirname(os.path.abspath(__file__))
         jar_path = os.path.join(jar_dir, 'languagetool', 'LanguageTool-6.6', 'languagetool-server.jar')
 
-        # --- Start server once ---
+        # Start server if not already running
         subprocess.Popen(
             ['java', '-jar', jar_path, '--port', str(self.server_port)],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         )
-        time.sleep(5)  # give server time to start
+        time.sleep(5)  # Give server time to start
 
-        # --- Connect to it ---
+        # Connect feedback tool to running server
         self.tool = language_tool_python.LanguageTool(
             'en-US',
             remote_server=f'http://localhost:{self.server_port}'
@@ -48,11 +48,11 @@ class FeedbackModule:
         self.error_cnt = len(self.matches)
         self.feedback = []
 
-        # Calculate accuracy based on word count (more meaningful than character count)
+        # Calculate accuracy based on word count
         word_count = max(len(self.input_text.split()), 1)  # Avoid division by zero
         self.acc = max(0.0, 1 - (self.error_cnt / word_count))
 
-        #breakdown by category
+        # Breakdown by category
         self.error_types = {'Grammar': 0, 'Style': 0, 'Typo': 0}
 
         for match in self.matches:

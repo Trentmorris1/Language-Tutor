@@ -1,0 +1,25 @@
+{
+  "name": "language-tutor",
+  "version": "1.0.0",
+  "description": "Interactive Language Tutor that helps users study a specific language and listening for correct pronunciations.",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Trentmorris1/Language-Tutor.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Trentmorris1/Language-Tutor/issues"
+  },
+  "homepage": "https://github.com/Trentmorris1/Language-Tutor#readme",
+  "devDependencies": {
+    "jest": "^30.2.0",
+    "jest-environment-jsdom": "^30.2.0"
+  }
+}

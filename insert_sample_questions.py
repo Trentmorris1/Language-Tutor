@@ -1,11 +1,11 @@
-# insert_sample_questions.py
+# Insert sample exercises into database
 import sqlite3
 import os
 
 DB_PATH = os.path.join('instance', 'language_tutor.db')
 
-# --- Sample reading and writing exercises ---
-# Each tuple = (type, prompt)
+# Sample reading and writing exercises
+# Each tuple uses the form (type, prompt)
 SAMPLE_EXERCISES = [
     ("reading", "He go to school every day."),
     ("reading", "They was happy to see us."),
@@ -36,8 +36,7 @@ def insert_exercises():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-
-    # Insert exercises (type, prompt)
+    # Insert exercises into the table
     cursor.executemany('''
         INSERT INTO exercises (type, prompt)
         VALUES (?, ?)

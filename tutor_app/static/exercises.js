@@ -41,17 +41,112 @@ function loadExercise(exerciseType) {
         });
 }
 
+function getExerciseElements(exerciseType) {
+    var prefix = exerciseType + '-';
+    return {
+        prefix: prefix,
+        input: document.getElementById(prefix + 'answer-input'),
+        submitButton: document.getElementById(prefix + 'submit-btn'),
+        feedback: document.getElementById(prefix + 'feedback'),
+        nextButton: document.getElementById(prefix + 'next-btn'),
+        continuePrompt: document.getElementById(prefix + 'continue-prompt')
+    };
+}
+
+function setButtonLoading(button, text) {
+    if (!button) {
+        return function noop() {};
+    }
+    var originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = text;
+    return function restore() {
+        button.disabled = false;
+        button.textContent = originalText;
+    };
+}
+
+function buildFeedbackHtml(feedback) {
+    var errorCount = feedback.error_count || 0;
+    var accuracy = feedback.accuracy !== undefined ? feedback.accuracy.toFixed(1) : 'N/A';
+
+    var html = '<h3 class="font-bold text-xl mb-4">Grammatical Analysis</h3>' +
+        '<div class="mb-6 p-6 bg-blue-50 rounded-xl border-l-4 border-blue-500">' +
+        '<p class="text-3xl font-black text-blue-700 mb-1">Accuracy: ' + accuracy + '%</p>' +
+        '<p class="text-sm text-blue-600">Based on error count and word analysis</p>' +
+        '</div>' +
+        '<p class="mb-4 text-lg"><strong>Total Errors Found:</strong> ' + errorCount + '</p>';
+
+    if (feedback.error_types) {
+        html += '<div class="mb-5">' +
+            '<p class="font-semibold text-lg">Error Breakdown:</p>' +
+            '<ul class="list-disc list-inside ml-4 space-y-1">';
+
+        if (feedback.error_types.Grammar) {
+            html += '<li>Grammar: ' + feedback.error_types.Grammar + '</li>';
+        }
+        if (feedback.error_types.Style) {
+            html += '<li>Style: ' + feedback.error_types.Style + '</li>';
+        }
+        if (feedback.error_types.Typo) {
+            html += '<li>Typo: ' + feedback.error_types.Typo + '</li>';
+        }
+        html += '</ul></div>';
+    }
+
+    if (feedback.feedback && feedback.feedback.length > 0) {
+        html += '<div class="mt-6 space-y-3">' +
+            '<p class="font-semibold text-lg">Detailed Feedback:</p>';
+
+        var itemsToShow = Math.min(feedback.feedback.length, 5);
+        for (var i = 0; i < itemsToShow; i++) {
+            var item = feedback.feedback[i];
+            var suggestions = (item.suggestions && item.suggestions.length > 0) ?
+                item.suggestions.slice(0, 3).join(', ') :
+                'No suggestions';
+            var errorText = item.error_text || '';
+            var message = item.message || '';
+
+            html += '<div class="bg-yellow-50 p-4 rounded-lg border-l-2 border-yellow-400">' +
+                '<p class="text-sm"><strong>Error:</strong> "' + escapeHtml(errorText) + '"</p>' +
+                '<p class="text-sm"><strong>Message:</strong> ' + escapeHtml(message) + '</p>' +
+                '<p class="text-sm"><strong>Suggestions:</strong> ' + escapeHtml(suggestions) + '</p>' +
+                '</div>';
+        }
+
+        html += '</div>';
+    } else {
+        html += '<p class="text-green-600 font-semibold mt-4 text-lg">✓ Great job! No errors found!</p>';
+    }
+
+    return html;
+}
+
+function showFeedbackAndActions(exerciseType, elements, feedback) {
+    if (elements.feedback) {
+        elements.feedback.classList.remove('hidden');
+        elements.feedback.innerHTML = buildFeedbackHtml(feedback);
+    }
+
+    if (exerciseType === 'reading' && elements.nextButton) {
+        elements.nextButton.classList.remove('hidden');
+    }
+
+    if (exerciseType === 'writing' && elements.continuePrompt) {
+        elements.continuePrompt.classList.remove('hidden');
+    }
+}
+
 // Handles submitting an exercise answer (unified for both reading and writing)
 function submitAnswer(exerciseType) {
-    var prefix = exerciseType + '-';
-    var inputElement = document.getElementById(prefix + 'answer-input');
-    
-    if (!inputElement) {
+    var elements = getExerciseElements(exerciseType);
+
+    if (!elements.input) {
         alert('Input element not found.');
         return;
     }
     
-    var userAnswer = inputElement.value.trim();
+    var userAnswer = elements.input.value.trim();
     
     if (!userAnswer) {
         alert('Please enter your answer.');
@@ -64,12 +159,7 @@ function submitAnswer(exerciseType) {
     }
     
     // Show loading state
-    var submitButton = document.getElementById(prefix + 'submit-btn');
-    var originalButtonText = submitButton ? submitButton.textContent : 'Submit';
-    if (submitButton) {
-        submitButton.disabled = true;
-        submitButton.textContent = 'Checking...';
-    }
+    var restoreButton = setButtonLoading(elements.submitButton, 'Checking...');
     
     // Call API to check answer
     var promptText = appState.currentExercise.prompt;
@@ -79,94 +169,10 @@ function submitAnswer(exerciseType) {
     })
         .then(function(result) {
             // Re-enable button
-            if (submitButton) {
-                submitButton.disabled = false;
-                submitButton.textContent = originalButtonText;
-            }
+            restoreButton();
             
             if (result.success && result.data && result.data.feedback) {
-                var feedback = result.data.feedback;
-                
-                // Display feedback
-                var feedbackDiv = document.getElementById(prefix + 'feedback');
-                if (feedbackDiv) {
-                    feedbackDiv.classList.remove('hidden');
-                    
-                    // Build feedback HTML
-                    var errorCount = feedback.error_count || 0;
-                    var accuracy = feedback.accuracy !== undefined ? feedback.accuracy.toFixed(1) : 'N/A';
-                    var feedbackHtml = '<h3 class="font-bold text-lg mb-3">Grammatical Analysis</h3>' +
-                        '<div class="mb-4 p-4 bg-blue-50 rounded-lg border-l-4 border-blue-500">' +
-                        '<p class="text-2xl font-bold text-blue-700 mb-1">Accuracy: ' + accuracy + '%</p>' +
-                        '<p class="text-sm text-blue-600">Based on error count and word analysis</p>' +
-                        '</div>' +
-                        '<p class="mb-2"><strong>Total Errors Found:</strong> ' + errorCount + '</p>';
-                    
-                    if (feedback.error_types) {
-                        feedbackHtml += '<div class="mb-3">' +
-                            '<p class="font-semibold">Error Breakdown:</p>' +
-                            '<ul class="list-disc list-inside ml-4">';
-                        
-                        if (feedback.error_types.Grammar) {
-                            feedbackHtml += '<li>Grammar: ' + feedback.error_types.Grammar + '</li>';
-                        }
-                        if (feedback.error_types.Style) {
-                            feedbackHtml += '<li>Style: ' + feedback.error_types.Style + '</li>';
-                        }
-                        if (feedback.error_types.Typo) {
-                            feedbackHtml += '<li>Typo: ' + feedback.error_types.Typo + '</li>';
-                        }
-                        
-                        feedbackHtml += '</ul>' +
-                            '</div>';
-                    }
-                    
-                    if (feedback.feedback && feedback.feedback.length > 0) {
-                        feedbackHtml += '<div class="mt-4 space-y-2">' +
-                            '<p class="font-semibold">Detailed Feedback:</p>';
-                        
-                        for (var i = 0; i < feedback.feedback.length && i < 5; i++) {
-                            var item = feedback.feedback[i];
-                            var suggestions;
-                            if (item.suggestions && item.suggestions.length > 0) {
-                                suggestions = item.suggestions.slice(0, 3).join(', ');
-                            } else {
-                                suggestions = 'No suggestions';
-                            }
-                            
-                            var errorText = item.error_text || '';
-                            var message = item.message || '';
-                            
-                            feedbackHtml += '<div class="bg-yellow-50 p-3 rounded border-l-2 border-yellow-400">' +
-                                '<p class="text-sm"><strong>Error:</strong> "' + escapeHtml(errorText) + '"</p>' +
-                                '<p class="text-sm"><strong>Message:</strong> ' + escapeHtml(message) + '</p>' +
-                                '<p class="text-sm"><strong>Suggestions:</strong> ' + escapeHtml(suggestions) + '</p>' +
-                                '</div>';
-                        }
-                        
-                        feedbackHtml += '</div>';
-                    } else {
-                        feedbackHtml += '<p class="text-green-600 font-semibold mt-2">✓ Great job! No errors found!</p>';
-                    }
-                    
-                    feedbackDiv.innerHTML = feedbackHtml;
-                }
-                
-                // Show next button or continue prompt based on exercise type
-                setTimeout(function() {
-                    if (exerciseType === 'reading') {
-                        var nextBtn = document.getElementById(prefix + 'next-btn');
-                        if (nextBtn) {
-                            nextBtn.classList.remove('hidden');
-                        }
-                    } else {
-                        var continueDiv = document.getElementById(prefix + 'continue-prompt');
-                        if (continueDiv) {
-                            continueDiv.classList.remove('hidden');
-                        }
-                    }
-                }, exerciseType === 'reading' ? 2000 : 1000);
-            
+                showFeedbackAndActions(exerciseType, elements, result.data.feedback);
             } else {
                 var errorMsg = result.error || 'Failed to check answer.';
                 alert('Error: ' + errorMsg);
@@ -215,4 +221,13 @@ function loadNextWritingExercise() {
     }
     
     loadExercise('writing');
+}
+
+// Export for testing in Node (ignored in browser)
+if (typeof module !== 'undefined') {
+    module.exports = {
+        setButtonLoading,
+        buildFeedbackHtml,
+        showFeedbackAndActions
+    };
 }

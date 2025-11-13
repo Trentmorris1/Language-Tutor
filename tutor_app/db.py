@@ -1,11 +1,11 @@
-# tutorapp/db.py
+# Tutor app database helpers
 import sqlite3
 from flask import current_app, g
 
 def get_db():
-    """Get a database connection that works both inside and outside Flask."""
+    # Provide a sqlite connection both inside and outside Flask context
     try:
-        # --- When inside Flask app context ---
+        # When inside Flask application context reuse the cached connection
         if 'db' not in g:
             g.db = sqlite3.connect(
                 current_app.config['DATABASE'],
@@ -15,22 +15,22 @@ def get_db():
         return g.db
 
     except RuntimeError:
-        # --- When running standalone (no Flask app context) ---
+        # When running standalone connect directly to the instance database
         db = sqlite3.connect("instance/language_tutor.db")
         db.row_factory = sqlite3.Row
         return db
 
 def close_db(e=None):
-    """Closes the database connection."""
+    # Close the sqlite connection at the end of a request
     db = g.pop('db', None)
     if db is not None:
         db.close()
 
 def init_db():
-    """Clear existing data and create new tables (same SQL as original app.py)."""
+    # Create core tables if they do not exist
     db = get_db()
     
-    # 1. Users Table 
+    # Users table
     db.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -39,7 +39,7 @@ def init_db():
         )
     ''')
     
-    # 2. Profiles Table 
+    # Profiles table
     db.execute('''
         CREATE TABLE IF NOT EXISTS profiles (
             user_id INTEGER PRIMARY KEY,
@@ -50,17 +50,7 @@ def init_db():
         )
     ''')
 
-    # 3. Review List 
-    db.execute('''
-        CREATE TABLE IF NOT EXISTS review_list (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            word TEXT NOT NULL,
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    ''')
-
-    # 4. Exercises Table 
+    # Exercises table
     db.execute('''
         CREATE TABLE IF NOT EXISTS exercises (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -69,7 +59,7 @@ def init_db():
         )
     ''')
 
-    # 5. Progress Table
+    # Progress table
     db.execute('''
         CREATE TABLE IF NOT EXISTS progress (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -80,12 +70,15 @@ def init_db():
             writing_ex_words INTEGER DEFAULT 0,
             total_errors INTEGER DEFAULT 0,
             total_words INTEGER DEFAULT 0,
+            grammar_errors INTEGER DEFAULT 0,
+            style_errors INTEGER DEFAULT 0,
+            typo_errors INTEGER DEFAULT 0,
             FOREIGN KEY (user_id) REFERENCES users (id)
                 ON DELETE CASCADE
                 ON UPDATE CASCADE
         )
     ''')
 
-
+    # Persist schema changes to disk
     db.commit()
 

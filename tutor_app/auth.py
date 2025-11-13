@@ -1,13 +1,14 @@
-# tutorapp/auth.py
+# Tutor app authentication endpoints
 from flask import Blueprint, request, jsonify, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from .db import get_db
 
+# Create blueprint for authentication routes
 bp = Blueprint('auth', __name__)
 
 def login_required(f):
-    """Decorator to require authentication for a route."""
+    # Enforce authentication before executing a protected route
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
@@ -17,6 +18,7 @@ def login_required(f):
 
 @bp.route('/register', methods=['POST'])
 def register():
+    # Create a new user record and corresponding profile
     data = request.get_json()
     email = data.get('email')
     password = data.get('password')
@@ -48,6 +50,7 @@ def register():
 
 @bp.route('/login', methods=['POST'])
 def login():
+    # Validate credentials and start a user session
     data = request.get_json()
     email = data.get('email')
     password = data.get('password')
@@ -63,7 +66,7 @@ def login():
     if profile is None:
         return jsonify({'success': False, 'message': 'Profile missing.'}), 500
 
-    # Store user_id and username in session
+    # Store user identifier and display name in session
     session['user_id'] = user['id']
     session['username'] = profile['username']
 
@@ -76,6 +79,6 @@ def login():
 
 @bp.route('/logout', methods=['POST'])
 def logout():
-    """Log out the current user by clearing the session."""
+    # Clear session data to log the user out
     session.clear()
     return jsonify({'success': True, 'message': 'Logged out successfully.'})

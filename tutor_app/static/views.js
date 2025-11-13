@@ -2,7 +2,7 @@
 
 // Main rendering function that displays the current view
 function renderApp() {
-    // Security: Enforce authentication rules
+    // Security enforce authentication rules
     if (!appState.isLoggedIn) {
         if (appState.view === 'register') {
             appState.view = 'register';
@@ -28,6 +28,7 @@ function renderApp() {
         loadProgressData();
     } else if (appState.view === 'progress') {
         appContainer.innerHTML = renderProgressPage();
+        loadProgressData();
     } else if (appState.view === 'exercise_type_select') {
         appContainer.innerHTML = renderExerciseTypeSelect();
     } else if (appState.view === 'reading_exercise') {
@@ -147,13 +148,28 @@ function loadProgressData() {
     apiCall('/api/progress', 'GET').then(function(result) {
         if (result.success && result.data && result.data.progress) {
             var progress = result.data.progress;
+
+            function toNumber(value) {
+                if (typeof value === 'number') {
+                    return isFinite(value) ? value : 0;
+                }
+                var parsed = parseFloat(value);
+                return isFinite(parsed) ? parsed : 0;
+            }
+
             updateState({
-                overallAccuracy: progress.overall_accuracy || 0
+                overallAccuracy: toNumber(progress.overall_accuracy),
+                readingAccuracy: toNumber(progress.reading_accuracy),
+                writingAccuracy: toNumber(progress.writing_accuracy),
+                errorPercentages: progress.error_percentages || { grammar: 0, style: 0, typo: 0 },
+                errorCounts: progress.error_counts || { grammar: 0, style: 0, typo: 0 }
             }, false);
 
-            // Refresh dashboard accuracy display without triggering a full rerender loop
+            // Refresh current view to show updated data
             if (appState.view === 'dashboard') {
                 appContainer.innerHTML = renderDashboard();
+            } else if (appState.view === 'progress') {
+                appContainer.innerHTML = renderProgressPage();
             }
         }
     }).catch(function(error) {
@@ -161,17 +177,77 @@ function loadProgressData() {
     });
 }
 
-// Renders the progress page (placeholder for future implementation)
+// Renders the detailed progress page
 function renderProgressPage() {
-    return '<div class="space-y-6 text-center">' +
-        '<h2 class="text-3xl font-bold text-primary">Progress</h2>' +
-        '<p class="text-gray-600">Detailed progress insights are coming soon.</p>' +
-        '<p class="text-sm text-gray-500">Current overall accuracy: ' +
-        (typeof appState.overallAccuracy === 'number' ? appState.overallAccuracy.toFixed(1) + '%' : '--') +
-        '</p>' +
-        '<button onclick="window.app.setView(\'dashboard\')" class="text-primary hover:underline mt-4">' +
-        '&larr; Back to Dashboard' +
-        '</button>' +
+    var overallAccuracy = typeof appState.overallAccuracy === 'number' ? appState.overallAccuracy.toFixed(1) : '--';
+    var readingAccuracy = typeof appState.readingAccuracy === 'number' ? appState.readingAccuracy.toFixed(1) : '--';
+    var writingAccuracy = typeof appState.writingAccuracy === 'number' ? appState.writingAccuracy.toFixed(1) : '--';
+
+    var percentages = appState.errorPercentages || { grammar: 0, style: 0, typo: 0 };
+    var grammarPercent = percentages.grammar || 0;
+    var stylePercent = percentages.style || 0;
+    var typoPercent = percentages.typo || 0;
+
+    var counts = appState.errorCounts || { grammar: 0, style: 0, typo: 0 };
+
+    var grammarEnd = grammarPercent;
+    var styleEnd = grammarEnd + stylePercent;
+    var typoEnd = styleEnd + typoPercent;
+
+    var chartStyle = 'background: conic-gradient(#ef4444 0% ' + grammarEnd + '%, ' +
+        '#f97316 ' + grammarEnd + '% ' + styleEnd + '%, ' +
+        '#facc15 ' + styleEnd + '% ' + Math.min(typoEnd, 100) + '%, ' +
+        '#e5e7eb ' + Math.min(typoEnd, 100) + '% 100%)';
+
+    return '<div class="space-y-12">' +
+        '<h2 class="text-4xl sm:text-5xl font-extrabold text-primary text-center sm:text-left">Progress Overview</h2>' +
+        '<div class="grid grid-cols-1 md:grid-cols-3 gap-8">' +
+        '<div class="bg-background p-10 sm:p-14 rounded-2xl border-t-8 border-secondary shadow-inner text-center space-y-3">' +
+        '<p class="text-lg text-gray-500 tracking-wide uppercase">Overall Accuracy</p>' +
+        '<p class="text-6xl sm:text-7xl font-black text-secondary">' + overallAccuracy + '%</p>' +
+        '</div>' +
+        '<div class="bg-background p-10 sm:p-14 rounded-2xl border-t-8 border-primary shadow-inner text-center space-y-3">' +
+        '<p class="text-lg text-gray-500 tracking-wide uppercase">Reading Accuracy</p>' +
+        '<p class="text-6xl sm:text-7xl font-black text-primary">' + readingAccuracy + '%</p>' +
+        '</div>' +
+        '<div class="bg-background p-10 sm:p-14 rounded-2xl border-t-8 border-accent shadow-inner text-center space-y-3">' +
+        '<p class="text-lg text-gray-500 tracking-wide uppercase">Writing Accuracy</p>' +
+        '<p class="text-6xl sm:text-7xl font-black text-accent">' + writingAccuracy + '%</p>' +
+        '</div>' +
+        '</div>' +
+        '<div class="bg-white border border-gray-200 rounded-2xl shadow-lg p-8 sm:p-12 space-y-8">' +
+        '<div class="flex flex-col lg:flex-row gap-10 lg:items-center">' +
+        '<div class="flex-1 text-center space-y-4">' +
+        '<h3 class="text-2xl font-bold text-gray-800">Error Type Breakdown</h3>' +
+        '<p class="text-gray-600">Visualize where most corrections happen.</p>' +
+        '<div class="mx-auto w-48 h-48 rounded-full shadow-inner border border-gray-200" style="' + chartStyle + '"></div>' +
+        '</div>' +
+        '<div class="flex-1 space-y-4">' +
+        '<div class="flex items-center gap-4 p-4 bg-red-50 rounded-xl border border-red-100">' +
+        '<span class="inline-block w-6 h-6 rounded-full" style="background-color:#ef4444;"></span>' +
+        '<div>' +
+        '<p class="font-semibold text-lg text-gray-800">Grammar Errors</p>' +
+        '<p class="text-gray-600">' + grammarPercent.toFixed(1) + '% · ' + counts.grammar + ' total</p>' +
+        '</div>' +
+        '</div>' +
+        '<div class="flex items-center gap-4 p-4 bg-orange-50 rounded-xl border border-orange-100">' +
+        '<span class="inline-block w-6 h-6 rounded-full" style="background-color:#f97316;"></span>' +
+        '<div>' +
+        '<p class="font-semibold text-lg text-gray-800">Style Errors</p>' +
+        '<p class="text-gray-600">' + stylePercent.toFixed(1) + '% · ' + counts.style + ' total</p>' +
+        '</div>' +
+        '</div>' +
+        '<div class="flex items-center gap-4 p-4 bg-yellow-50 rounded-xl border border-yellow-100">' +
+        '<span class="inline-block w-6 h-6 rounded-full" style="background-color:#facc15;"></span>' +
+        '<div>' +
+        '<p class="font-semibold text-lg text-gray-800">Typo Errors</p>' +
+        '<p class="text-gray-600">' + typoPercent.toFixed(1) + '% · ' + counts.typo + ' total</p>' +
+        '</div>' +
+        '</div>' +
+        '</div>' +
+        '</div>' +
+        '</div>' +
+        '<button onclick="window.app.setView(\'dashboard\')" class="text-primary hover:underline text-lg">&larr; Back to Dashboard</button>' +
         '</div>';
 }
 

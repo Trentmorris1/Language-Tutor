@@ -1,4 +1,4 @@
-# tutorapp/exercises.py
+# Tutor app exercises module
 # Flask API endpoints for exercise functionality
 
 from flask import Blueprint, request, jsonify, session
@@ -20,7 +20,7 @@ class LearningFacade(Subject):
         self.attach(self.progress_tracker)
 
     def get_exercise(self, exercise_type, exercise_id=None):
-        #Fetch a random exercise of the given type (or a specific one if ID provided).
+        # Fetch a random exercise of the given type or by id
         if exercise_id:
             cursor = self.db.execute(
                 'SELECT * FROM exercises WHERE id = ? AND type = ?', 
@@ -37,13 +37,13 @@ class LearningFacade(Subject):
         if not row:
             raise ValueError(f'No exercise found for type: {exercise_type}')
         
-        # Convert SQLite Row to dict for safer access
+        # Convert sqlite row to dict for safer access
         if hasattr(row, 'keys'):
             row_dict = dict(row)
         else:
             row_dict = row
         
-        # Access fields - these should exist in the database
+        # Access fields that exist in the database
         prompt = row_dict.get('prompt')
         
         if not prompt:
@@ -90,9 +90,9 @@ def get_exercise(exercise_type):
         exercise = facade.get_exercise(exercise_type)
         
         # Format response based on exercise type
-        # Both reading and writing exercises now use the same Exercise class with prompt and type
+        # Both reading and writing exercises use the same exercise class
         exercise_data = {
-            'id': None,  # We don't track IDs in the current implementation
+            'id': None,  # We do not track ids in the current implementation
             'type': exercise.type,
             'prompt': exercise.prompt
         }

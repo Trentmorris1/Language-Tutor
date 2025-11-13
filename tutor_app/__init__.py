@@ -7,35 +7,38 @@ from .db import init_db, close_db
 
 
 def create_app():
+    # Create core Flask application with instance specific storage
     app = Flask(__name__, instance_relative_config=True)
-    # Enable credentials (cookies) for CORS - required for sessions
+    # Enable credentials for cross origin requests so sessions persist
     CORS(app, supports_credentials=True)
 
-    # Set up configuration
+    # Register application level configuration defaults
     app.config.from_mapping(
         SECRET_KEY='dev',
         DATABASE=os.path.join(app.instance_path, 'language_tutor.db'),
     )
 
-    # Ensure the instance folder exists
+    # Ensure the instance directory exists before database usage
     os.makedirs(app.instance_path, exist_ok=True)
 
-    # Register teardown so DB closes after each request
+    # Register teardown so database connections close after requests
     app.teardown_appcontext(close_db)
 
-    # Register blueprints (optional for now)
+    # Register authentication blueprint when available
     try:
         from . import auth
         app.register_blueprint(auth.bp)
     except ImportError:
         pass
     
+    # Register exercises blueprint when available
     try:
         from . import exercises
         app.register_blueprint(exercises.bp)
     except ImportError:
         pass
 
+    # Register progress blueprint when available
     try:
         from . import progress
         app.register_blueprint(progress.bp)
@@ -44,12 +47,13 @@ def create_app():
 
     @app.cli.command('init-db')
     def init_db_command():
-        """Initialize the database (create tables)."""
+        # Initialize database schema through CLI command
         db.init_db()
         print('Database initialized.')
 
     @app.route('/')
     def index():
+        # Render single page application container template
         return render_template('index.html')
 
     return app

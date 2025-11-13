@@ -13,10 +13,10 @@ function apiCall(endpoint, method, body) {
     var options = {
         method: method,
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include'  // Include cookies in requests (required for sessions)
+        credentials: 'include'  // Include cookies for session handling
     };
     
-    // Add body if provided (for POST/PUT requests)
+    // Add body if provided for non GET requests
     if (body) {
         options.body = JSON.stringify(body);
     }
@@ -43,7 +43,7 @@ function apiCall(endpoint, method, body) {
             });
         })
         .catch(function(error) {
-            // Handle network errors, JSON parsing errors, etc.
+            // Handle network and parsing errors
             console.error('API call failed for ' + endpoint + ':', error);
             return {
                 success: false,
