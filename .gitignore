@@ -62,3 +62,5 @@ tutor_app/languagetool/LanguageTool-6.6/
 *.pyc
 *.pyo
 *.pyd
+
+node_modules/
