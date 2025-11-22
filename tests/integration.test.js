@@ -3,11 +3,11 @@
  * setButtonLoading + buildFeedbackHtml + showFeedbackAndActions
  */
 
-import {
+const {
   setButtonLoading,
   buildFeedbackHtml,
   showFeedbackAndActions,
-} from '../tutor_app/static/exercises';
+} = require('../tutor_app/static/exercises');
 
 // If escapeHtml is a global in your app, re-create the same passthrough mock:
 global.escapeHtml = (str) => str;
