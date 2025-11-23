@@ -1,166 +1,141 @@
 /**
- * Integration tests for exercises UI flow:
- * setButtonLoading + buildFeedbackHtml + showFeedbackAndActions
+ * @jest-environment jsdom
  */
 
+// Import the functions from your script
 const {
   setButtonLoading,
   buildFeedbackHtml,
   showFeedbackAndActions,
-} = require('../tutor_app/static/exercises');
+} = require('../tutor_app/static/exercises.js');
 
-// If escapeHtml is a global in your app, re-create the same passthrough mock:
-global.escapeHtml = (str) => str;
+// Mock global helpers used by the tests
+global.escapeHtml = (str) => str; // Mock simple passthrough escapeHtml for feedback builder
 
-describe('Exercises integration: feedback flow', () => {
-  let button;
-  let feedbackDiv;
-  let nextButton;
-  let continuePrompt;
-
-  beforeEach(() => {
+describe('Exercises integration: button loading + feedback UI flow', () => {
+  test('INT1: reading flow uses setButtonLoading and showFeedbackAndActions together', () => {
+    // Arrange DOM: check button + reading feedback UI
     document.body.innerHTML = `
-      <button id="check-btn">Check</button>
-      <div id="feedback" class="hidden"></div>
-      <button id="next-btn" class="hidden">Next</button>
-      <div id="continue-prompt" class="hidden">Continue writing…</div>
+      <button id="check-btn" class="">Check</button>
+      <div id="reading-feedback" class="hidden"></div>
+      <button id="reading-next-btn" class="hidden"></button>
+      <div id="reading-continue-prompt" class="hidden"></div>
     `;
 
-    button = document.getElementById('check-btn');
-    feedbackDiv = document.getElementById('feedback');
-    nextButton = document.getElementById('next-btn');
-    continuePrompt = document.getElementById('continue-prompt');
-  });
-
-  function buildElementsObject() {
-    return {
-      feedback: feedbackDiv,
-      nextButton,
-      continuePrompt,
+    const button = document.getElementById('check-btn');
+    const elements = {
+      feedback: document.getElementById('reading-feedback'),
+      nextButton: document.getElementById('reading-next-btn'),
+      continuePrompt: document.getElementById('reading-continue-prompt'),
     };
-  }
 
-  test('INT1: reading exercise happy path (all three functions together)', () => {
-    // Arrange – starting state
+    const feedback = {
+      error_count: 0,
+      accuracy: 100,
+      feedback: [],
+    };
+
+    // Act 1: enter loading state on the button
+    const restore = setButtonLoading(button, 'Loading...');
+
+    expect(button.disabled).toBe(true);
+    expect(button.textContent).toBe('Loading...');
+
+    // Act 2: show feedback and actions for a READING exercise
+    showFeedbackAndActions('reading', elements, feedback);
+
+    // Assert: feedback content & visibility (this exercises buildFeedbackHtml internally)
+    expect(elements.feedback.classList.contains('hidden')).toBe(false);
+    expect(elements.feedback.innerHTML).toContain('Accuracy: 100.0%');
+    expect(elements.nextButton.classList.contains('hidden')).toBe(false);
+    expect(elements.continuePrompt.classList.contains('hidden')).toBe(true);
+
+    // Act 3: restore button after flow completes
+    restore();
+
+    // Assert: button is restored to original state
     expect(button.disabled).toBe(false);
     expect(button.textContent).toBe('Check');
-
-    // Act step 1: enter loading state
-    const restoreButton = setButtonLoading(button);
-
-    // Simulated backend feedback object (what your real API would return)
-    const feedback = {
-      accuracy: 95.0,
-      error_count: 2,
-      error_types: {
-        Grammar: 1,
-        Typo: 1,
-      },
-      errors: [
-        { text: 'Ths', message: 'Possible typo: "This"' },
-        { text: 'is are', message: 'Subject-verb agreement issue' },
-      ],
-      has: {
-        error_types: true,
-        suggestions: true,
-      },
-      suggestions: ['Check spelling', 'Review subject-verb agreement'],
-    };
-
-    // Act step 2: build feedback HTML
-    const html = buildFeedbackHtml(feedback);
-
-    // Act step 3: show feedback and actions for a reading exercise
-    const elements = buildElementsObject();
-    showFeedbackAndActions(html, 'reading', elements);
-
-    // Act step 4: restore button state (as your click handler would do after success)
-    restoreButton();
-
-    // Assert: button restored
-    expect(button.disabled).toBe(false);
-    expect(button.textContent).toBe('Check'); // original label
-
-    // Assert: feedback content and visibility
-    expect(feedbackDiv.classList.contains('hidden')).toBe(false);
-    expect(feedbackDiv.innerHTML).toContain('95.0');
-    expect(feedbackDiv.innerHTML).toContain('Error Breakdown');
-    expect(feedbackDiv.innerHTML).toContain('Grammar');
-    expect(feedbackDiv.innerHTML).toContain('Typo');
-
-    // Assert: reading workflow actions
-    expect(nextButton.classList.contains('hidden')).toBe(false);
-    expect(continuePrompt.classList.contains('hidden')).toBe(true);
   });
 
-  test('INT2: writing exercise happy path', () => {
-    const restoreButton = setButtonLoading(button);
+  test('INT2: writing flow uses setButtonLoading and showFeedbackAndActions together', () => {
+    // Arrange DOM: check button + writing feedback UI
+    document.body.innerHTML = `
+      <button id="check-btn" class="">Check</button>
+      <div id="writing-feedback" class="hidden"></div>
+      <button id="writing-next-btn" class="hidden"></button>
+      <div id="writing-continue-prompt" class="hidden"></div>
+    `;
 
-    const feedback = {
-      accuracy: 80.0,
-      error_count: 5,
-      error_types: {
-        Grammar: 3,
-        Typo: 2,
-      },
-      errors: [
-        { text: 'He go to school', message: 'Verb form incorrect' },
-      ],
-      has: {
-        error_types: true,
-        suggestions: true,
-      },
-      suggestions: ['Rewrite sentence with correct verb tense'],
-    };
-
-    const html = buildFeedbackHtml(feedback);
-    const elements = buildElementsObject();
-    showFeedbackAndActions(html, 'writing', elements);
-    restoreButton();
-
-    // Feedback visible with detailed section for writing
-    expect(feedbackDiv.classList.contains('hidden')).toBe(false);
-    expect(feedbackDiv.innerHTML).toContain('80.0');
-    expect(feedbackDiv.innerHTML).toContain('Detailed Feedback');
-
-    // Writing workflow actions: continue prompt visible, next hidden
-    expect(continuePrompt.classList.contains('hidden')).toBe(false);
-    expect(nextButton.classList.contains('hidden')).toBe(true);
-  });
-
-  test('INT3: missing feedback element handled gracefully', () => {
-    // Simulate missing feedback element – typical integration fault
-    feedbackDiv.remove();
-
-    const restoreButton = setButtonLoading(button);
-
-    const feedback = {
-      accuracy: 100.0,
-      error_count: 0,
-      error_types: {},
-      errors: [],
-      has: {
-        error_types: false,
-        suggestions: false,
-      },
-      suggestions: [],
-    };
-
-    const html = buildFeedbackHtml(feedback);
+    const button = document.getElementById('check-btn');
     const elements = {
-      feedback: null,           // intentionally missing
-      nextButton,
-      continuePrompt,
+      feedback: document.getElementById('writing-feedback'),
+      nextButton: document.getElementById('writing-next-btn'),
+      continuePrompt: document.getElementById('writing-continue-prompt'),
     };
 
-    // Should NOT throw even though elements.feedback is null
+    const feedback = {
+      error_count: 1,
+      accuracy: 75,
+      feedback: [],
+    };
+
+    // Act 1: enter loading state
+    const restore = setButtonLoading(button, 'Loading...');
+
+    expect(button.disabled).toBe(true);
+    expect(button.textContent).toBe('Loading...');
+
+    // Act 2: show feedback and actions for a WRITING exercise
+    showFeedbackAndActions('writing', elements, feedback);
+
+    // Assert: feedback visible and writing-specific UI
+    expect(elements.feedback.classList.contains('hidden')).toBe(false);
+    expect(elements.continuePrompt.classList.contains('hidden')).toBe(false);
+    expect(elements.nextButton.classList.contains('hidden')).toBe(true);
+
+    // Act 3: restore button
+    restore();
+
+    expect(button.disabled).toBe(false);
+    expect(button.textContent).toBe('Check');
+  });
+
+  test('INT3: missing feedback element is handled gracefully for reading flow', () => {
+    // Arrange DOM with NO feedback container
+    document.body.innerHTML = `
+      <button id="check-btn" class="">Check</button>
+      <button id="reading-next-btn" class="hidden"></button>
+      <div id="reading-continue-prompt" class="hidden"></div>
+    `;
+
+    const button = document.getElementById('check-btn');
+    const elements = {
+      feedback: null, // intentionally missing
+      nextButton: document.getElementById('reading-next-btn'),
+      continuePrompt: document.getElementById('reading-continue-prompt'),
+    };
+
+    const feedback = {
+      error_count: 0,
+      accuracy: 100,
+      feedback: [],
+    };
+
+    const restore = setButtonLoading(button, 'Loading...');
+
+    // Act & Assert: showFeedbackAndActions should NOT throw even without feedback element
     expect(() => {
-      showFeedbackAndActions(html, 'reading', elements);
+      showFeedbackAndActions('reading', elements, feedback);
     }).not.toThrow();
 
-    // Next button still becomes visible for reading exercises
-    expect(nextButton.classList.contains('hidden')).toBe(false);
+    // Next button should still become visible for reading flow
+    expect(elements.nextButton.classList.contains('hidden')).toBe(false);
 
-    restoreButton();
+    // And restore button at the end
+    restore();
+    expect(button.disabled).toBe(false);
+    expect(button.textContent).toBe('Check');
   });
 });
+
